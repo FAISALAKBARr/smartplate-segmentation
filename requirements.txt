@@ -1,8 +1,8 @@
 streamlit
 ultralytics
-opencv-python
 pillow
 numpy
 gdown
 matplotlib
 pandas
+opencv-python-headless==4.9.0.80

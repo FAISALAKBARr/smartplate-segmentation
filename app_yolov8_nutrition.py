@@ -4,272 +4,177 @@ import numpy as np
 from PIL import Image
 import cv2
 import gdown
+import matplotlib.pyplot as plt
+import pandas as pd
 
-# Page config
+# ⭐ MUST BE FIRST - Only ONE st.set_page_config()
 st.set_page_config(
-    page_title="SmartPlate - Nutrition Segmentation",
+    page_title="SmartPlate - Nutrition Analysis",
     page_icon="🍽️",
     layout="wide"
 )
 
-# Model configuration
-MODEL_ID = 'YOUR_GOOGLE_DRIVE_FILE_ID'  # ⚠️ CHANGE THIS
+#==============================================================================
+# CONFIGURATION
+#==============================================================================
+
+MODEL_ID = '1KPbuf5rjNLT9oRsQuZ8f3Xncl4qoIGBL'  # ⚠️ CHANGE THIS
 MODEL_PATH = 'best_nutrition_segmentation.pt'
 CONFIDENCE_THRESHOLD = 0.25
 IOU_THRESHOLD = 0.45
 
-# Classes
 CLASSES = ['buah', 'karbohidrat', 'minuman', 'protein', 'sayur']
-CLASS_COLORS = {
-    0: (255, 107, 107),  # buah - red
-    1: (249, 202, 36),   # karbohidrat - yellow
-    2: (52, 152, 219),   # minuman - blue
-    3: (225, 112, 85),   # protein - orange
-    4: (0, 184, 148)     # sayur - green
+
+#==============================================================================
+# NUTRITION DATABASE
+#==============================================================================
+
+NUTRITION_DB = {
+    'buah': {
+        'name': 'Buah',
+        'emoji': '🍎',
+        'density': 0.8,
+        'kalori_per_100g': 52,
+        'protein_per_100g': 0.3,
+        'karbohidrat_per_100g': 14,
+        'lemak_per_100g': 0.2,
+        'serat_per_100g': 2.4
+    },
+    'karbohidrat': {
+        'name': 'Karbohidrat',
+        'emoji': '🍚',
+        'density': 1.0,
+        'kalori_per_100g': 130,
+        'protein_per_100g': 2.7,
+        'karbohidrat_per_100g': 28,
+        'lemak_per_100g': 0.3,
+        'serat_per_100g': 0.4
+    },
+    'minuman': {
+        'name': 'Minuman',
+        'emoji': '🥤',
+        'density': 1.0,
+        'kalori_per_100g': 42,
+        'protein_per_100g': 0,
+        'karbohidrat_per_100g': 11,
+        'lemak_per_100g': 0,
+        'serat_per_100g': 0
+    },
+    'protein': {
+        'name': 'Protein',
+        'emoji': '🍗',
+        'density': 1.1,
+        'kalori_per_100g': 165,
+        'protein_per_100g': 31,
+        'karbohidrat_per_100g': 0,
+        'lemak_per_100g': 3.6,
+        'serat_per_100g': 0
+    },
+    'sayur': {
+        'name': 'Sayur',
+        'emoji': '🥗',
+        'density': 0.6,
+        'kalori_per_100g': 23,
+        'protein_per_100g': 2.9,
+        'karbohidrat_per_100g': 3.6,
+        'lemak_per_100g': 0.4,
+        'serat_per_100g': 2.6
+    }
 }
 
-# Custom CSS
+IDEAL_COMPOSITION = {
+    'buah': {'percentage': 15},
+    'karbohidrat': {'percentage': 30},
+    'minuman': {'percentage': 10},
+    'protein': {'percentage': 20},
+    'sayur': {'percentage': 25}
+}
+
+AKG_DATABASE = {
+    'male_adult': {
+        'kalori': 2150, 'protein': 62, 'karbohidrat': 340,
+        'lemak': 67, 'serat': 37
+    },
+    'female_adult': {
+        'kalori': 1900, 'protein': 56, 'karbohidrat': 300,
+        'lemak': 59, 'serat': 32
+    },
+    'child': {
+        'kalori': 1650, 'protein': 45, 'karbohidrat': 250,
+        'lemak': 50, 'serat': 25
+    }
+}
+
+#==============================================================================
+# CUSTOM CSS
+#==============================================================================
+
 st.markdown("""
     <style>
     .main {padding: 20px;}
-    .stButton>button {width: 100%; background-color: #0245d6; color: white;}
+    .stButton>button {
+        width: 100%; 
+        background-color: #0245d6; 
+        color: white;
+        border-radius: 10px;
+        height: 50px;
+        font-size: 18px;
+        font-weight: bold;
+    }
+    .balance-indicator {
+        padding: 20px; 
+        border-radius: 10px; 
+        text-align: center;
+        font-size: 24px; 
+        font-weight: bold; 
+        margin: 20px 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .balanced {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+        color: white;
+    }
+    .not-balanced {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+        color: white;
+    }
+    .metric-card {
+        background: white;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        text-align: center;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-@st.cache_resource
-def load_model():
-    """Load YOLOv8 segmentation model"""
-    try:
-        from ultralytics import YOLO
-        
-        if not os.path.exists(MODEL_PATH):
-            with st.spinner('📥 Downloading model...'):
-                url = f'https://drive.google.com/uc?id={MODEL_ID}'
-                gdown.download(url, MODEL_PATH, quiet=False)
-                st.success('✅ Model downloaded!')
-        
-        with st.spinner('🔄 Loading model...'):
-            model = YOLO(MODEL_PATH)
-            st.success('✅ Model loaded!')
-        
-        return model
-    
-    except ImportError:
-        st.error("❌ Run: pip install ultralytics")
-        return None
-    except Exception as e:
-        st.error(f"❌ Error: {str(e)}")
-        return None
+#==============================================================================
+# HELPER FUNCTIONS
+#==============================================================================
 
-def process_results(image, results, conf_threshold):
-    """Process and visualize results - SIMPLIFIED VERSION"""
-    img_array = np.array(image).copy()
-    overlay = img_array.copy()
-    detections = []
+def calculate_nutrition_from_grams(class_name, weight_grams):
+    """Calculate nutrition from weight"""
+    db = NUTRITION_DB[class_name]
+    factor = weight_grams / 100
     
-    result = results[0]
-    
-    if result.masks is None or len(result.masks) == 0:
-        return Image.fromarray(img_array), []
-    
-    # Process each detection
-    for i, (box, mask, cls, conf) in enumerate(zip(
-        result.boxes.xyxy, result.masks.data, result.boxes.cls, result.boxes.conf
-    )):
-        if conf < conf_threshold:
-            continue
-        
-        class_idx = int(cls)
-        class_name = CLASSES[class_idx]
-        confidence = float(conf)
-        
-        # Get mask
-        mask_array = mask.cpu().numpy()
-        mask_resized = cv2.resize(mask_array, (img_array.shape[1], img_array.shape[0]))
-        
-        # Color
-        import matplotlib.pyplot as plt
-        color = plt.cm.tab10(class_idx)[:3]
-        color_rgb = tuple([int(c * 255) for c in color])
-        
-        # Draw mask overlay
-        mask_bool = mask_resized > 0.5
-        for c in range(3):
-            overlay[:, :, c] = np.where(
-                mask_bool,
-                overlay[:, :, c] * 0.6 + color_rgb[c] * 0.4,
-                overlay[:, :, c]
-            )
-        
-        # Draw box
-        x1, y1, x2, y2 = box.cpu().numpy().astype(int)
-        cv2.rectangle(img_array, (x1, y1), (x2, y2), color_rgb, 2)
-        
-        # Label
-        label = f"{class_name}: {confidence:.2%}"
-        cv2.rectangle(img_array, (x1, y1-25), (x1+150, y1), color_rgb, -1)
-        cv2.putText(img_array, label, (x1+5, y1-8),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 2)
-        
-        detections.append({
-            'class': class_name,
-            'confidence': confidence
-        })
-    
-    # Blend
-    final_img = cv2.addWeighted(img_array, 0.7, overlay, 0.3, 0)
-    
-    return Image.fromarray(final_img), detections
+    return {
+        'kalori': db['kalori_per_100g'] * factor,
+        'protein': db['protein_per_100g'] * factor,
+        'karbohidrat': db['karbohidrat_per_100g'] * factor,
+        'lemak': db['lemak_per_100g'] * factor,
+        'serat': db['serat_per_100g'] * factor
+    }
 
-def main():
-    model = load_model()
-    
-    if model is None:
-        st.stop()
-    
-    st.title("🍽️ SmartPlate - Nutrition Segmentation")
-    st.markdown("### Deteksi Makanan dengan YOLOv8 Instance Segmentation")
-    
-    # Sidebar
-    with st.sidebar:
-        st.markdown("### ⚙️ Settings")
-        conf_threshold = st.slider("Confidence", 0.0, 1.0, 0.25, 0.05)
-        
-        st.divider()
-        st.markdown("### 📚 Categories")
-        for i, cls in enumerate(CLASSES):
-            color_hex = '#' + ''.join([f'{c:02x}' for c in CLASS_COLORS[i]])
-            st.markdown(f"<span style='color:{color_hex}'>●</span> {cls}", 
-                       unsafe_allow_html=True)
-    
-    # Main tabs
-    tab1, tab2 = st.tabs(["📤 Upload", "📸 Camera"])
-    
-    with tab1:
-        uploaded_file = st.file_uploader("Upload image", type=['jpg', 'jpeg', 'png'])
-        
-        if uploaded_file:
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                image = Image.open(uploaded_file)
-                st.image(image, caption="Original", use_container_width=True)
-            
-            if st.button("🔍 Detect", type="primary"):
-                with st.spinner("Analyzing..."):
-                    results = model.predict(
-                        source=image, 
-                        conf=conf_threshold,
-                        iou=IOU_THRESHOLD,
-                        verbose=False
-                    )
-                    
-                    annotated_img, detections = process_results(
-                        image, results, conf_threshold
-                    )
-                    
-                    with col2:
-                        st.image(annotated_img, caption="Result", 
-                               use_container_width=True)
-                    
-                    if detections:
-                        st.success(f"✅ Detected {len(detections)} objects")
-                        for i, det in enumerate(detections, 1):
-                            st.write(f"{i}. **{det['class']}** - {det['confidence']:.1%}")
-                    else:
-                        st.warning("No objects detected")
-    
-    with tab2:
-        camera_img = st.camera_input("Take photo")
-        
-        if camera_img:
-            image = Image.open(camera_img)
-            
-            with st.spinner("Analyzing..."):
-                results = model.predict(
-                    source=image,
-                    conf=conf_threshold,
-                    iou=IOU_THRESHOLD,
-                    verbose=False
-                )
-                
-                annotated_img, detections = process_results(
-                    image, results, conf_threshold
-                )
-                
-                st.image(annotated_img, use_container_width=True)
-                
-                if detections:
-                    st.success(f"✅ Detected {len(detections)} objects")
-                    for i, det in enumerate(detections, 1):
-                        st.write(f"{i}. **{det['class']}** - {det['confidence']:.1%}")
-    
-    st.divider()
-    st.markdown("© 2024 SmartPlate | Powered by YOLOv8-seg")
-
-if __name__ == '__main__':
-    main()
-
-# Page config
-st.set_page_config(
-    page_title="SmartPlate - Nutrition Segmentation",
-    page_icon="🍽️",
-    layout="wide"
-)
-
-# Model configuration
-MODEL_ID = 'YOUR_GOOGLE_DRIVE_FILE_ID'  # ⚠️ CHANGE THIS
-MODEL_PATH = 'best_nutrition_segmentation.pt'
-CONFIDENCE_THRESHOLD = 0.25
-IOU_THRESHOLD = 0.45
-
-# Classes
-CLASSES = ['buah', 'karbohidrat', 'minuman', 'protein', 'sayur']
-
-# Custom CSS
-st.markdown("""
-    <style>
-    .main {padding: 20px;}
-    .stButton>button {width: 100%; background-color: #0245d6; color: white;}
-    .nutrition-card {padding: 15px; border-radius: 10px; margin: 10px 0; 
-                     box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
-    .balance-indicator {padding: 20px; border-radius: 10px; text-align: center;
-                        font-size: 24px; font-weight: bold; margin: 20px 0;}
-    .balanced {background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;}
-    .not-balanced {background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;}
-    </style>
-""", unsafe_allow_html=True)
-
-@st.cache_resource
-def load_model():
-    """Load YOLOv8 segmentation model"""
-    try:
-        from ultralytics import YOLO
-        
-        if not os.path.exists(MODEL_PATH):
-            with st.spinner('📥 Downloading model...'):
-                url = f'https://drive.google.com/uc?id={MODEL_ID}'
-                gdown.download(url, MODEL_PATH, quiet=False)
-                st.success('✅ Model downloaded!')
-        
-        with st.spinner('🔄 Loading YOLOv8 segmentation model...'):
-            model = YOLO(MODEL_PATH)
-            st.success('✅ Model loaded!')
-        
-        return model
-    
-    except ImportError:
-        st.error("❌ Ultralytics not installed. Run: pip install ultralytics")
-        return None
-    except Exception as e:
-        st.error(f"❌ Error: {str(e)}")
-        return None
+def calculate_percentage_of_akg(nutrition, user_type='male_adult'):
+    """Calculate percentage of daily recommended intake"""
+    akg = AKG_DATABASE[user_type]
+    return {
+        key: (nutrition[key] / akg[key] * 100) if key in akg else 0
+        for key in nutrition
+    }
 
 def detect_plate_and_calibrate(image):
-    """
-    Detect circular plate for calibration
-    Returns pixel_to_cm ratio
-    """
+    """Detect circular plate for calibration"""
     gray = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2GRAY)
     gray = cv2.medianBlur(gray, 5)
     
@@ -289,39 +194,23 @@ def detect_plate_and_calibrate(image):
         
         return pixel_to_cm, largest_circle
     
-    # Default fallback
-    return 0.05, None  # Assume 1 pixel ≈ 0.05 cm
+    return 0.05, None
 
 def calculate_weight_from_mask(mask_array, pixel_to_cm, class_name):
-    """
-    Convert segmentation mask to weight (grams)
-    
-    Steps:
-    1. Count mask pixels
-    2. Convert to cm² using calibration
-    3. Estimate volume (area × avg_height)
-    4. Convert to grams (volume × density)
-    """
-    # Count pixels in mask
+    """Convert segmentation mask to weight (grams)"""
     mask_pixels = np.sum(mask_array > 0)
-    
-    # Convert to area (cm²)
     area_cm2 = mask_pixels * (pixel_to_cm ** 2)
     
-    # Get average height for this class (assumption)
     avg_heights = {
-        'karbohidrat': 2.5,  # cm
+        'karbohidrat': 2.5,
         'protein': 3.0,
         'sayur': 2.0,
         'buah': 3.5,
-        'minuman': 10.0  # height in glass
+        'minuman': 10.0
     }
     height_cm = avg_heights.get(class_name, 2.5)
     
-    # Calculate volume
     volume_cm3 = area_cm2 * height_cm
-    
-    # Get density and calculate weight
     density = NUTRITION_DB[class_name]['density']
     weight_grams = volume_cm3 * density
     
@@ -332,12 +221,41 @@ def calculate_weight_from_mask(mask_array, pixel_to_cm, class_name):
         'weight_grams': float(weight_grams)
     }
 
+#==============================================================================
+# MODEL LOADING
+#==============================================================================
+
+@st.cache_resource
+def load_model():
+    """Load YOLOv8 segmentation model"""
+    try:
+        from ultralytics import YOLO
+        
+        if not os.path.exists(MODEL_PATH):
+            with st.spinner('📥 Downloading model from Google Drive...'):
+                url = f'https://drive.google.com/uc?id={MODEL_ID}'
+                gdown.download(url, MODEL_PATH, quiet=False)
+                st.success('✅ Model downloaded!')
+        
+        with st.spinner('🔄 Loading YOLOv8 segmentation model...'):
+            model = YOLO(MODEL_PATH)
+            st.success('✅ Model loaded successfully!')
+        
+        return model
+    
+    except ImportError:
+        st.error("❌ Ultralytics not installed. Run: pip install ultralytics")
+        return None
+    except Exception as e:
+        st.error(f"❌ Error loading model: {str(e)}")
+        return None
+
+#==============================================================================
+# RESULT PROCESSING
+#==============================================================================
+
 def process_segmentation_results(image, results, conf_threshold=0.25):
-    """
-    Process YOLOv8 segmentation results
-    Returns: annotated image, detection list, nutrition analysis
-    """
-    # Calibrate using plate detection
+    """Process YOLOv8 segmentation results"""
     pixel_to_cm, plate_circle = detect_plate_and_calibrate(image)
     
     img_array = np.array(image).copy()
@@ -349,7 +267,6 @@ def process_segmentation_results(image, results, conf_threshold=0.25):
     if result.masks is None or len(result.masks) == 0:
         return Image.fromarray(img_array), [], None
     
-    # Process each detection
     for i, (box, mask, cls, conf) in enumerate(zip(
         result.boxes.xyxy, result.masks.data, result.boxes.cls, result.boxes.conf
     )):
@@ -360,22 +277,16 @@ def process_segmentation_results(image, results, conf_threshold=0.25):
         class_name = CLASSES[class_idx]
         confidence = float(conf)
         
-        # Get mask and resize to image size
         mask_array = mask.cpu().numpy()
         mask_resized = cv2.resize(mask_array, (img_array.shape[1], img_array.shape[0]))
         
-        # Calculate weight from mask
         weight_info = calculate_weight_from_mask(mask_resized, pixel_to_cm, class_name)
         weight_grams = weight_info['weight_grams']
-        
-        # Calculate nutrition
         nutrition = calculate_nutrition_from_grams(class_name, weight_grams)
         
-        # Get color for this class
         color = plt.cm.tab10(class_idx)[:3]
         color_rgb = tuple([int(c * 255) for c in color])
         
-        # Draw segmentation mask (overlay)
         mask_bool = mask_resized > 0.5
         for c in range(3):
             overlay[:, :, c] = np.where(
@@ -384,39 +295,30 @@ def process_segmentation_results(image, results, conf_threshold=0.25):
                 overlay[:, :, c]
             )
         
-        # Draw bounding box
         x1, y1, x2, y2 = box.cpu().numpy().astype(int)
         cv2.rectangle(img_array, (x1, y1), (x2, y2), color_rgb, 2)
         
-        # Draw label with nutrition info
-        label = f"{class_name}: {weight_grams:.0f}g, {nutrition['kalori']:.0f}kcal"
+        label = f"{class_name}: {weight_grams:.0f}g"
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.5
+        font_scale = 0.6
         thickness = 2
         (text_w, text_h), _ = cv2.getTextSize(label, font, font_scale, thickness)
         
         cv2.rectangle(img_array, (x1, y1 - text_h - 10), 
-                     (x1 + text_w, y1), color_rgb, -1)
-        cv2.putText(img_array, label, (x1, y1 - 5),
+                     (x1 + text_w + 10, y1), color_rgb, -1)
+        cv2.putText(img_array, label, (x1 + 5, y1 - 5),
                    font, font_scale, (255, 255, 255), thickness)
         
-        # Store detection info
         detections.append({
             'id': i + 1,
             'class': class_name,
             'confidence': confidence,
-            'bbox': [x1, y1, x2, y2],
-            'mask_pixels': weight_info['mask_pixels'],
-            'area_cm2': weight_info['area_cm2'],
-            'volume_cm3': weight_info['volume_cm3'],
             'weight_grams': weight_grams,
             'nutrition': nutrition
         })
     
-    # Blend original with overlay
     final_img = cv2.addWeighted(img_array, 0.7, overlay, 0.3, 0)
     
-    # Draw plate circle if detected
     if plate_circle is not None:
         cx, cy, r = plate_circle
         cv2.circle(final_img, (cx, cy), r, (0, 255, 0), 2)
@@ -426,13 +328,16 @@ def process_segmentation_results(image, results, conf_threshold=0.25):
     
     return Image.fromarray(final_img), detections, pixel_to_cm
 
+#==============================================================================
+# NUTRITION ANALYSIS
+#==============================================================================
+
 def analyze_nutrition_balance(detections, user_type='male_adult'):
     """Comprehensive nutrition analysis"""
     
     if not detections:
         return None
     
-    # Aggregate nutrition
     total_nutrition = {
         'kalori': 0, 'protein': 0, 'lemak': 0,
         'karbohidrat': 0, 'serat': 0
@@ -446,30 +351,25 @@ def analyze_nutrition_balance(detections, user_type='male_adult'):
         weight = det['weight_grams']
         nutrition = det['nutrition']
         
-        # Sum nutrition
         for key in total_nutrition:
             if key in nutrition:
                 total_nutrition[key] += nutrition[key]
         
-        # Track composition
         if class_name not in composition:
             composition[class_name] = {'weight': 0, 'count': 0}
         composition[class_name]['weight'] += weight
         composition[class_name]['count'] += 1
         total_weight += weight
     
-    # Calculate percentages
     for class_name in composition:
         composition[class_name]['percentage'] = \
             (composition[class_name]['weight'] / total_weight * 100) if total_weight > 0 else 0
     
-    # Check completeness
     detected_classes = set(composition.keys())
     required_classes = set(CLASSES)
     missing_classes = required_classes - detected_classes
     completeness_score = (len(detected_classes) / len(required_classes)) * 100
     
-    # Check composition deviation from ideal
     composition_deviations = {}
     total_deviation = 0
     
@@ -481,11 +381,8 @@ def analyze_nutrition_balance(detections, user_type='male_adult'):
         total_deviation += abs(deviation)
     
     composition_score = max(0, 100 - total_deviation)
-    
-    # Final balance score
     balance_score = (completeness_score * 0.6) + (composition_score * 0.4)
     
-    # Determine status
     if balance_score >= 90:
         status = 'seimbang'
         message = '🎉 Sempurna! Piring Anda sangat seimbang!'
@@ -499,10 +396,8 @@ def analyze_nutrition_balance(detections, user_type='male_adult'):
         status = 'tidak_seimbang'
         message = '❌ Tidak Seimbang. Tambahkan komponen yang kurang.'
     
-    # AKG percentage
     akg_percentage = calculate_percentage_of_akg(total_nutrition, user_type)
     
-    # Generate recommendations
     recommendations = []
     
     if missing_classes:
@@ -529,16 +424,17 @@ def analyze_nutrition_balance(detections, user_type='male_adult'):
         'total_nutrition': total_nutrition,
         'composition': composition,
         'total_weight': total_weight,
-        'completeness_score': completeness_score,
-        'composition_score': composition_score,
         'balance_score': balance_score,
         'status': status,
         'message': message,
         'missing_classes': list(missing_classes),
-        'deviations': composition_deviations,
         'akg_percentage': akg_percentage,
         'recommendations': recommendations
     }
+
+#==============================================================================
+# DISPLAY FUNCTIONS
+#==============================================================================
 
 def display_nutrition_analysis(analysis, detections):
     """Display comprehensive nutrition analysis"""
@@ -588,8 +484,6 @@ def display_nutrition_analysis(analysis, detections):
         st.write(f"**{label}**: {percentage:.1f}%")
         st.progress(min(percentage / 100, 1.0))
     
-    st.caption("*AKG: Angka Kecukupan Gizi (untuk dewasa laki-laki)")
-    
     # Composition
     st.markdown("### 🍽️ Komposisi Piring")
     
@@ -629,9 +523,12 @@ def display_nutrition_analysis(analysis, detections):
             - Berat: {det['weight_grams']:.0f} gram
             - Kalori: {det['nutrition']['kalori']:.0f} kcal
             - Protein: {det['nutrition']['protein']:.1f} g
-            - Karbohidrat: {det['nutrition']['karbohidrat']:.1f} g
             - Confidence: {det['confidence']:.2%}
             """)
+
+#==============================================================================
+# MAIN APP
+#==============================================================================
 
 def main():
     model = load_model()
@@ -643,7 +540,7 @@ def main():
     with st.sidebar:
         st.title("ℹ️ SmartPlate")
         st.markdown("**Nutrition Balance Detector**")
-        st.markdown("Menggunakan YOLOv8 Instance Segmentation")
+        st.markdown("Powered by YOLOv8 Segmentation")
         
         st.divider()
         
@@ -651,12 +548,12 @@ def main():
         conf_threshold = st.slider("Confidence Threshold", 0.0, 1.0, 0.25, 0.05)
         
         user_type = st.selectbox(
-            "Tipe Pengguna (untuk AKG)",
+            "Tipe Pengguna",
             ['male_adult', 'female_adult', 'child'],
             format_func=lambda x: {
-                'male_adult': 'Dewasa Laki-laki',
-                'female_adult': 'Dewasa Perempuan',
-                'child': 'Anak (10-12 tahun)'
+                'male_adult': '👨 Dewasa Laki-laki',
+                'female_adult': '👩 Dewasa Perempuan',
+                'child': '🧒 Anak (10-12 tahun)'
             }[x]
         )
         
@@ -686,11 +583,16 @@ def main():
             
             if st.button("🔍 Analisis", type="primary"):
                 with st.spinner("Sedang menganalisis..."):
-                    results = model.predict(source=image, conf=conf_threshold, 
-                                           iou=IOU_THRESHOLD, verbose=False)
+                    results = model.predict(
+                        source=image, 
+                        conf=conf_threshold, 
+                        iou=IOU_THRESHOLD, 
+                        verbose=False
+                    )
                     
-                    annotated_img, detections, pixel_to_cm = \
-                        process_segmentation_results(image, results, conf_threshold)
+                    annotated_img, detections, _ = process_segmentation_results(
+                        image, results, conf_threshold
+                    )
                     
                     st.session_state['annotated_img'] = annotated_img
                     st.session_state['detections'] = detections
@@ -716,8 +618,12 @@ def main():
             image = Image.open(camera_img)
             
             with st.spinner("Menganalisis..."):
-                results = model.predict(source=image, conf=conf_threshold,
-                                       iou=IOU_THRESHOLD, verbose=False)
+                results = model.predict(
+                    source=image, 
+                    conf=conf_threshold,
+                    iou=IOU_THRESHOLD, 
+                    verbose=False
+                )
                 
                 annotated_img, detections, _ = process_segmentation_results(
                     image, results, conf_threshold
