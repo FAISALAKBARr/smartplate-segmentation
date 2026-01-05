@@ -1,8 +1,8 @@
-streamlit
-ultralytics
-pillow
-numpy
-gdown
-matplotlib
-pandas
+streamlit==1.31.0
+ultralytics==8.1.0
 opencv-python-headless==4.9.0.80
+pillow==10.2.0
+numpy==1.26.3
+gdown==5.1.0
+matplotlib==3.8.2
+pandas==2.2.0
