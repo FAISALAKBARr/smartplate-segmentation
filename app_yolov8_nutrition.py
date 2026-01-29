@@ -638,7 +638,7 @@ def main():
     st.divider()
     st.markdown("""
     <div style="text-align: center;">
-        <p>© 2024 Andromeda Team | Powered by YOLOv8-seg</p>
+        <p>© 2026 Mochamad Faisal Akbar | Powered by YOLOv8-seg</p>
     </div>
     """, unsafe_allow_html=True)
 
