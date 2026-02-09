@@ -158,25 +158,31 @@ st.markdown("""
         text-align: center;
     }
     .warning-box {
-        background-color: #fff3cd;
-        border-left: 5px solid #ffc107;
-        padding: 15px;
+        background-color: #fff4e5;
+        border: 2px solid #ff9800;
+        border-left: 6px solid #f57c00;
+        padding: 18px;
         margin: 20px 0;
-        border-radius: 5px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(245, 124, 0, 0.15);
     }
     .info-box {
-        background-color: #d1ecf1;
-        border-left: 5px solid #0c5460;
-        padding: 15px;
+        background-color: #e3f2fd;
+        border: 2px solid #42a5f5;
+        border-left: 6px solid #1976d2;
+        padding: 18px;
         margin: 20px 0;
-        border-radius: 5px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(25, 118, 210, 0.15);
     }
     .error-box {
-        background-color: #f8d7da;
-        border-left: 5px solid #dc3545;
-        padding: 15px;
+        background-color: #ffebee;
+        border: 2px solid #ef5350;
+        border-left: 6px solid #d32f2f;
+        padding: 18px;
         margin: 20px 0;
-        border-radius: 5px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(211, 47, 47, 0.15);
     }
     </style>
 """, unsafe_allow_html=True)
