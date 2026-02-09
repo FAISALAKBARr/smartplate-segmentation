@@ -567,6 +567,25 @@ def main():
     # Main App
     st.title("🍽️ SmartPlate - Nutrition Balance Detector")
     st.markdown("### Analisis Nutrisi dengan Instance Segmentation")
+    # ⚠️ TAMBAHKAN WARNING BOX DI AWAL
+    st.warning("""
+    ⚠️ **PETUNJUK PENGGUNAAN PENTING**:
+    
+    1. **Foto semua makanan yang akan dikonsumsi dalam SATU gambar**
+       - Sistem hanya dapat mendeteksi objek yang terlihat di foto
+       - Jika ada makanan yang tidak difoto, nutrisinya TIDAK akan dihitung
+    
+    2. **Gunakan piring putih polos diameter 25 cm** (jika memungkinkan)
+       - Untuk estimasi porsi yang lebih akurat
+    
+    3. **Ambil foto dari atas (top-view)** dengan pencahayaan cukup
+       - Hindari bayangan yang menutupi makanan
+    
+    4. **Pastikan semua makanan terlihat jelas**, tidak tertutup atau overlap
+    
+    ⚠️ **CATATAN**: Estimasi nutrisi bersifat PERKIRAAN berdasarkan 
+    segmentasi 2D dan asumsi tinggi/densitas rata-rata per kategori.
+    """)
     
     tab1, tab2 = st.tabs(["📤 Upload Gambar", "📸 Camera"])
     
