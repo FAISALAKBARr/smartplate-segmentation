@@ -18,7 +18,7 @@ st.set_page_config(
 # CONFIGURATION
 #==============================================================================
 
-MODEL_ID = '1KPbuf5rjNLT9oRsQuZ8f3Xncl4qoIGBL'  # ⚠️ CHANGE THIS
+MODEL_ID = '1KPbuf5rjNLT9oRsQuZ8f3Xncl4qoIGBL'  # ⚠️ CHANGE THIS to your model ID
 MODEL_PATH = 'best_nutrition_segmentation.pt'
 CONFIDENCE_THRESHOLD = 0.25
 IOU_THRESHOLD = 0.45
@@ -102,6 +102,18 @@ AKG_DATABASE = {
     'child': {
         'kalori': 1650, 'protein': 45, 'karbohidrat': 250,
         'lemak': 50, 'serat': 25
+    },
+    'pregnant_trimester1': {
+        'kalori': 2080, 'protein': 57, 'karbohidrat': 325,
+        'lemak': 61.3, 'serat': 35
+    },
+    'pregnant_trimester2': {
+        'kalori': 2200, 'protein': 66, 'karbohidrat': 340,
+        'lemak': 61.3, 'serat': 36
+    },
+    'pregnant_trimester3': {
+        'kalori': 2200, 'protein': 86, 'karbohidrat': 340,
+        'lemak': 61.3, 'serat': 36
     }
 }
 
@@ -144,6 +156,27 @@ st.markdown("""
         border-radius: 10px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         text-align: center;
+    }
+    .warning-box {
+        background-color: #fff3cd;
+        border-left: 5px solid #ffc107;
+        padding: 15px;
+        margin: 20px 0;
+        border-radius: 5px;
+    }
+    .info-box {
+        background-color: #d1ecf1;
+        border-left: 5px solid #0c5460;
+        padding: 15px;
+        margin: 20px 0;
+        border-radius: 5px;
+    }
+    .error-box {
+        background-color: #f8d7da;
+        border-left: 5px solid #dc3545;
+        padding: 15px;
+        margin: 20px 0;
+        border-radius: 5px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -194,19 +227,31 @@ def detect_plate_and_calibrate(image):
         
         return pixel_to_cm, largest_circle
     
+    # Fallback calibration if no plate detected
     return 0.05, None
 
 def calculate_weight_from_mask(mask_array, pixel_to_cm, class_name):
-    """Convert segmentation mask to weight (grams)"""
+    """
+    Convert segmentation mask to weight (grams)
+    
+    Formula: Berat = Area_2D × Tinggi_rata-rata × Densitas
+    
+    CATATAN: Ini adalah PERKIRAAN berdasarkan asumsi:
+    - Tinggi makanan diasumsikan konstan per kategori
+    - Densitas diasumsikan konstan per kategori
+    - Estimasi dapat berbeda 15-30% dari berat aktual
+    """
     mask_pixels = np.sum(mask_array > 0)
     area_cm2 = mask_pixels * (pixel_to_cm ** 2)
     
+    # Asumsi tinggi rata-rata per kategori (dalam cm)
+    # Berdasarkan observasi porsi normal makanan Indonesia
     avg_heights = {
-        'karbohidrat': 2.5,
-        'protein': 3.0,
-        'sayur': 2.0,
-        'buah': 3.5,
-        'minuman': 10.0
+        'karbohidrat': 2.5,   # Tumpukan nasi/roti
+        'protein': 3.0,       # Ketebalan ayam/ikan
+        'sayur': 2.0,         # Tumpukan sayur tumis/kuah
+        'buah': 3.5,          # Ketebalan potongan buah
+        'minuman': 10.0       # Tinggi cairan dalam gelas
     }
     height_cm = avg_heights.get(class_name, 2.5)
     
@@ -218,7 +263,8 @@ def calculate_weight_from_mask(mask_array, pixel_to_cm, class_name):
         'mask_pixels': int(mask_pixels),
         'area_cm2': float(area_cm2),
         'volume_cm3': float(volume_cm3),
-        'weight_grams': float(weight_grams)
+        'weight_grams': float(weight_grams),
+        'estimated_height_cm': height_cm
     }
 
 #==============================================================================
@@ -265,7 +311,7 @@ def process_segmentation_results(image, results, conf_threshold=0.25):
     result = results[0]
     
     if result.masks is None or len(result.masks) == 0:
-        return Image.fromarray(img_array), [], None
+        return Image.fromarray(img_array), [], None, False
     
     for i, (box, mask, cls, conf) in enumerate(zip(
         result.boxes.xyxy, result.masks.data, result.boxes.cls, result.boxes.conf
@@ -314,7 +360,8 @@ def process_segmentation_results(image, results, conf_threshold=0.25):
             'class': class_name,
             'confidence': confidence,
             'weight_grams': weight_grams,
-            'nutrition': nutrition
+            'nutrition': nutrition,
+            'weight_info': weight_info
         })
     
     final_img = cv2.addWeighted(img_array, 0.7, overlay, 0.3, 0)
@@ -326,7 +373,9 @@ def process_segmentation_results(image, results, conf_threshold=0.25):
                    (cx-50, cy-r-10), cv2.FONT_HERSHEY_SIMPLEX, 
                    0.6, (0, 255, 0), 2)
     
-    return Image.fromarray(final_img), detections, pixel_to_cm
+    plate_detected = plate_circle is not None
+    
+    return Image.fromarray(final_img), detections, pixel_to_cm, plate_detected
 
 #==============================================================================
 # NUTRITION ANALYSIS
@@ -443,6 +492,19 @@ def display_nutrition_analysis(analysis, detections):
         st.warning("Tidak ada data nutrisi untuk ditampilkan")
         return
     
+    # ⚠️ WARNING JIKA ADA KATEGORI HILANG
+    if analysis['missing_classes']:
+        st.markdown(f"""
+        <div class="warning-box">
+            <h4>⚠️ PERINGATAN: Kategori Makanan Tidak Terdeteksi</h4>
+            <p>Kategori berikut <strong>TIDAK TERDETEKSI</strong> dalam gambar:</p>
+            <ul>
+                {''.join([f"<li>{NUTRITION_DB[c]['emoji']} <strong>{NUTRITION_DB[c]['name']}</strong></li>" for c in analysis['missing_classes']])}
+            </ul>
+            <p><strong>Jika Anda mengonsumsi makanan dari kategori ini, silakan foto ulang dengan menyertakan SEMUA makanan yang akan dikonsumsi dalam SATU gambar.</strong></p>
+        </div>
+        """, unsafe_allow_html=True)
+    
     # Balance Status
     if analysis['status'] == 'seimbang':
         st.markdown(f"""
@@ -482,7 +544,17 @@ def display_nutrition_analysis(analysis, detections):
     for nutrient, percentage in akg.items():
         label = nutrient.capitalize()
         st.write(f"**{label}**: {percentage:.1f}%")
-        st.progress(min(percentage / 100, 1.0))
+        
+        # Color coding for progress bar
+        if percentage < 80:
+            st.progress(min(percentage / 100, 1.0))
+            st.caption(f"⚠️ Masih kurang {100-percentage:.1f}% dari target harian")
+        elif percentage <= 120:
+            st.progress(min(percentage / 100, 1.0))
+            st.caption("✅ Sudah memenuhi kebutuhan harian")
+        else:
+            st.progress(1.0)
+            st.caption(f"⚠️ Melebihi {percentage-100:.1f}% dari target harian")
     
     # Composition
     st.markdown("### 🍽️ Komposisi Piring")
@@ -516,21 +588,86 @@ def display_nutrition_analysis(analysis, detections):
         st.info(f"• {rec}")
     
     # Detailed breakdown
-    with st.expander("🔍 Detail Per Objek"):
+    with st.expander("🔍 Detail Per Objek Terdeteksi"):
         for det in detections:
             st.markdown(f"""
             **{det['id']}. {NUTRITION_DB[det['class']]['emoji']} {NUTRITION_DB[det['class']]['name']}**
-            - Berat: {det['weight_grams']:.0f} gram
+            - Berat Estimasi: {det['weight_grams']:.0f} gram
+            - Tinggi Asumsi: {det['weight_info']['estimated_height_cm']} cm
+            - Luas Area: {det['weight_info']['area_cm2']:.1f} cm²
+            - Volume Estimasi: {det['weight_info']['volume_cm3']:.1f} cm³
             - Kalori: {det['nutrition']['kalori']:.0f} kcal
             - Protein: {det['nutrition']['protein']:.1f} g
             - Confidence: {det['confidence']:.2%}
+            
+            ---
             """)
+        
+        st.markdown("""
+        <div class="info-box">
+            <h5>ℹ️ Catatan Estimasi Berat</h5>
+            <p>Estimasi berat dihitung menggunakan formula:</p>
+            <p><strong>Berat = Area_2D × Tinggi_rata-rata × Densitas</strong></p>
+            <p>Ini adalah <strong>PERKIRAAN AWAL</strong> dengan keterbatasan:</p>
+            <ul>
+                <li>Tinggi makanan diasumsikan konstan per kategori</li>
+                <li>Tidak akurat untuk makanan bertumpuk tinggi</li>
+                <li>Estimasi dapat berbeda 15-30% dari berat aktual</li>
+            </ul>
+            <p>Untuk akurasi lebih baik, gunakan timbangan digital.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 #==============================================================================
 # MAIN APP
 #==============================================================================
 
 def main():
+    # ⭐ CRITICAL: Display warning FIRST before anything else
+    st.markdown("""
+    <div class="warning-box">
+        <h3>⚠️ PETUNJUK PENGGUNAAN PENTING - WAJIB DIBACA!</h3>
+        <h4>Untuk Hasil Analisis Nutrisi yang Akurat:</h4>
+        <ol>
+            <li><strong>📸 FOTO SEMUA MAKANAN dalam SATU GAMBAR</strong>
+                <ul>
+                    <li>Sistem hanya dapat mendeteksi objek yang terlihat di foto</li>
+                    <li>Jika ada makanan yang tidak difoto, nutrisinya TIDAK akan dihitung</li>
+                    <li>Pastikan SEMUA makanan dan minuman yang akan dikonsumsi terlihat jelas</li>
+                </ul>
+            </li>
+            <li><strong>🍽️ Gunakan piring putih polos diameter 25 cm</strong> (jika memungkinkan)
+                <ul>
+                    <li>Untuk estimasi porsi yang lebih akurat</li>
+                    <li>Jika tidak ada piring, sistem akan menggunakan fallback calibration</li>
+                </ul>
+            </li>
+            <li><strong>📐 Ambil foto dari ATAS (top-view)</strong> dengan pencahayaan cukup
+                <ul>
+                    <li>Hindari bayangan yang menutupi makanan</li>
+                    <li>Jarak ideal: 30-50 cm dari makanan</li>
+                </ul>
+            </li>
+            <li><strong>✋ Pastikan makanan TIDAK saling menutupi (overlap)</strong>
+                <ul>
+                    <li>Susun makanan agar semua komponen terlihat jelas</li>
+                    <li>Pisahkan makanan yang bertumpuk jika memungkinkan</li>
+                </ul>
+            </li>
+        </ol>
+        <h4>⚠️ DISCLAIMER - Keterbatasan Sistem:</h4>
+        <ul>
+            <li><strong>Estimasi berat bersifat PERKIRAAN</strong> berdasarkan segmentasi 2D</li>
+            <li>Formula: <code>Berat = Area_2D × Tinggi_asumsi × Densitas_asumsi</code></li>
+            <li>Tinggi dan densitas diasumsikan konstan per kategori makanan</li>
+            <li><strong>Akurasi estimasi: ±15-30%</strong> dari berat aktual</li>
+            <li>Tidak akurat untuk makanan bertumpuk tinggi atau bentuk 3D kompleks</li>
+            <li>Sistem ini adalah <strong>baseline research</strong> untuk pengembangan selanjutnya</li>
+        </ul>
+        <p><em>Untuk kebutuhan medis atau diet ketat, konsultasikan dengan ahli gizi profesional.</em></p>
+    </div>
+    """, unsafe_allow_html=True)
+    
     model = load_model()
     
     if model is None:
@@ -548,44 +685,54 @@ def main():
         conf_threshold = st.slider("Confidence Threshold", 0.0, 1.0, 0.25, 0.05)
         
         user_type = st.selectbox(
-            "Tipe Pengguna",
-            ['male_adult', 'female_adult', 'child'],
+            "Profil Pengguna",
+            ['male_adult', 'female_adult', 'child', 'pregnant_trimester1', 'pregnant_trimester2', 'pregnant_trimester3'],
             format_func=lambda x: {
                 'male_adult': '👨 Dewasa Laki-laki',
                 'female_adult': '👩 Dewasa Perempuan',
-                'child': '🧒 Anak (10-12 tahun)'
+                'child': '🧒 Anak (10-12 tahun)',
+                'pregnant_trimester1': '🤰 Ibu Hamil Trimester 1',
+                'pregnant_trimester2': '🤰 Ibu Hamil Trimester 2',
+                'pregnant_trimester3': '🤰 Ibu Hamil Trimester 3'
             }[x]
         )
         
+        # Show AKG for selected profile
+        st.markdown("### 📊 AKG Target Harian")
+        akg_target = AKG_DATABASE[user_type]
+        st.write(f"Kalori: {akg_target['kalori']} kkal")
+        st.write(f"Protein: {akg_target['protein']} g")
+        st.write(f"Karbohidrat: {akg_target['karbohidrat']} g")
+        st.write(f"Lemak: {akg_target['lemak']} g")
+        st.write(f"Serat: {akg_target['serat']} g")
+        
         st.divider()
         
-        st.markdown("### 📚 Kategori")
+        st.markdown("### 📚 Kategori Deteksi")
         for class_name in CLASSES:
             info = NUTRITION_DB[class_name]
             st.markdown(f"**{info['emoji']} {info['name']}**")
+        
+        st.divider()
+        
+        st.markdown("### ℹ️ Tentang Sistem")
+        st.markdown("""
+        **Versi:** 2.0  
+        **Model:** YOLOv8-seg  
+        **Dataset:** FoodSeg103 + Indonesia  
+        **Kategori:** 4 Sehat 5 Sempurna  
+        
+        **Improvisasi Model:**
+        - Copy-paste augmentation
+        - Mixup augmentation
+        - Random erasing
+        - Multi-scale training
+        - Cosine LR scheduling
+        """)
     
     # Main App
     st.title("🍽️ SmartPlate - Nutrition Balance Detector")
     st.markdown("### Analisis Nutrisi dengan Instance Segmentation")
-    # ⚠️ TAMBAHKAN WARNING BOX DI AWAL
-    st.warning("""
-    ⚠️ **PETUNJUK PENGGUNAAN PENTING**:
-    
-    1. **Foto semua makanan yang akan dikonsumsi dalam SATU gambar**
-       - Sistem hanya dapat mendeteksi objek yang terlihat di foto
-       - Jika ada makanan yang tidak difoto, nutrisinya TIDAK akan dihitung
-    
-    2. **Gunakan piring putih polos diameter 25 cm** (jika memungkinkan)
-       - Untuk estimasi porsi yang lebih akurat
-    
-    3. **Ambil foto dari atas (top-view)** dengan pencahayaan cukup
-       - Hindari bayangan yang menutupi makanan
-    
-    4. **Pastikan semua makanan terlihat jelas**, tidak tertutup atau overlap
-    
-    ⚠️ **CATATAN**: Estimasi nutrisi bersifat PERKIRAAN berdasarkan 
-    segmentasi 2D dan asumsi tinggi/densitas rata-rata per kategori.
-    """)
     
     tab1, tab2 = st.tabs(["📤 Upload Gambar", "📸 Camera"])
     
@@ -600,8 +747,8 @@ def main():
                 image = Image.open(uploaded_file)
                 st.image(image, caption="Gambar Original", use_container_width=True)
             
-            if st.button("🔍 Analisis", type="primary"):
-                with st.spinner("Sedang menganalisis..."):
+            if st.button("🔍 Analisis Nutrisi", type="primary"):
+                with st.spinner("⏳ Sedang menganalisis makanan Anda..."):
                     results = model.predict(
                         source=image, 
                         conf=conf_threshold, 
@@ -609,12 +756,14 @@ def main():
                         verbose=False
                     )
                     
-                    annotated_img, detections, _ = process_segmentation_results(
+                    annotated_img, detections, pixel_to_cm, plate_detected = process_segmentation_results(
                         image, results, conf_threshold
                     )
                     
                     st.session_state['annotated_img'] = annotated_img
                     st.session_state['detections'] = detections
+                    st.session_state['pixel_to_cm'] = pixel_to_cm
+                    st.session_state['plate_detected'] = plate_detected
                     st.session_state['analysis'] = analyze_nutrition_balance(
                         detections, user_type
                     )
@@ -622,21 +771,44 @@ def main():
             if 'annotated_img' in st.session_state:
                 with col2:
                     st.image(st.session_state['annotated_img'],
-                           caption="Hasil Segmentation", use_container_width=True)
+                           caption="Hasil Segmentasi & Deteksi", use_container_width=True)
+                
+                # Info tentang kalibrasi
+                if st.session_state['plate_detected']:
+                    st.success(f"✅ Piring terdeteksi! Kalibrasi: {st.session_state['pixel_to_cm']:.4f} cm/pixel")
+                else:
+                    st.warning(f"⚠️ Piring tidak terdeteksi. Menggunakan fallback calibration: {st.session_state['pixel_to_cm']:.4f} cm/pixel")
+                    st.info("💡 Untuk estimasi lebih akurat, gunakan piring putih polos diameter 25 cm")
                 
                 st.divider()
-                display_nutrition_analysis(
-                    st.session_state['analysis'],
-                    st.session_state['detections']
-                )
+                
+                if st.session_state['detections']:
+                    display_nutrition_analysis(
+                        st.session_state['analysis'],
+                        st.session_state['detections']
+                    )
+                else:
+                    st.markdown("""
+                    <div class="error-box">
+                        <h4>❌ Tidak Ada Makanan Terdeteksi</h4>
+                        <p>Sistem tidak dapat mendeteksi makanan dalam gambar. Kemungkinan penyebab:</p>
+                        <ul>
+                            <li>Pencahayaan terlalu gelap atau terlalu terang</li>
+                            <li>Makanan terlalu kecil atau terlalu jauh</li>
+                            <li>Makanan tidak termasuk dalam 5 kategori yang didukung</li>
+                            <li>Foto terlalu blur atau tidak fokus</li>
+                        </ul>
+                        <p><strong>Saran:</strong> Coba foto ulang dengan pencahayaan lebih baik dan jarak lebih dekat (30-50 cm).</p>
+                    </div>
+                    """, unsafe_allow_html=True)
     
     with tab2:
-        camera_img = st.camera_input("Ambil foto")
+        camera_img = st.camera_input("Ambil foto makanan Anda")
         
         if camera_img:
             image = Image.open(camera_img)
             
-            with st.spinner("Menganalisis..."):
+            with st.spinner("⏳ Menganalisis foto dari kamera..."):
                 results = model.predict(
                     source=image, 
                     conf=conf_threshold,
@@ -644,20 +816,33 @@ def main():
                     verbose=False
                 )
                 
-                annotated_img, detections, _ = process_segmentation_results(
+                annotated_img, detections, pixel_to_cm, plate_detected = process_segmentation_results(
                     image, results, conf_threshold
                 )
                 
-                st.image(annotated_img, use_container_width=True)
+                st.image(annotated_img, caption="Hasil Analisis", use_container_width=True)
                 
-                analysis = analyze_nutrition_balance(detections, user_type)
-                display_nutrition_analysis(analysis, detections)
+                # Info kalibrasi
+                if plate_detected:
+                    st.success(f"✅ Piring terdeteksi! Kalibrasi: {pixel_to_cm:.4f} cm/pixel")
+                else:
+                    st.warning(f"⚠️ Piring tidak terdeteksi. Fallback calibration: {pixel_to_cm:.4f} cm/pixel")
+                
+                st.divider()
+                
+                if detections:
+                    analysis = analyze_nutrition_balance(detections, user_type)
+                    display_nutrition_analysis(analysis, detections)
+                else:
+                    st.error("❌ Tidak ada makanan terdeteksi. Silakan foto ulang dengan pencahayaan lebih baik.")
     
     # Footer
     st.divider()
     st.markdown("""
-    <div style="text-align: center;">
-        <p>© 2026 Mochamad Faisal Akbar | Powered by YOLOv8-seg</p>
+    <div style="text-align: center; color: #666;">
+        <p><strong>SmartPlate v2.0</strong> - Nutrition Balance Detector</p>
+        <p>© 2025 Mochamad Faisal Akbar | Powered by YOLOv8-seg</p>
+        <p><em>Sistem ini menggunakan estimasi berbasis computer vision. Untuk kebutuhan medis, konsultasikan dengan ahli gizi.</em></p>
     </div>
     """, unsafe_allow_html=True)
 
