@@ -26,7 +26,7 @@ IOU_THRESHOLD = 0.45
 CLASSES = ['buah', 'karbohidrat', 'minuman', 'protein', 'sayur']
 
 #==============================================================================
-# NUTRITION DATABASE
+# NUTRITION DATABASE [TKPI (Tabel Komposisi Pangan Indonesia)]
 #==============================================================================
 
 NUTRITION_DB = {
@@ -82,6 +82,12 @@ NUTRITION_DB = {
     }
 }
 
+#Konsep "Isi Piringku" - Kemenkes RI (2017)
+# Karbohidrat: 1/3 piring (~33%)
+# Sayur: 1/3 piring (~33%)
+# Protein: 1/6 piring (~17%)
+# Buah: pelengkap (~17%)
+# Minuman: 8 gelas per hari
 IDEAL_COMPOSITION = {
     'buah': {'percentage': 15},
     'karbohidrat': {'percentage': 30},
@@ -244,7 +250,11 @@ def calculate_weight_from_mask(mask_array, pixel_to_cm, class_name):
     Convert segmentation mask to weight (grams)
     
     Formula: Berat = Area_2D × Tinggi_rata-rata × Densitas
-    
+    # Contoh untuk nasi (karbohidrat):
+    # area_cm2 = jumlah_pixel × (pixel_to_cm)²
+    # volume_cm3 = area_cm2 × 2.5cm        # Tinggi DIASUMSIKAN 2.5cm
+    # berat_gram = volume_cm3 × 1.0        # Densitas nasi diasumsikan 1.0 g/cm³
+
     CATATAN: Ini adalah PERKIRAAN berdasarkan asumsi:
     - Tinggi makanan diasumsikan konstan per kategori
     - Densitas diasumsikan konstan per kategori
