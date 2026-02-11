@@ -176,6 +176,18 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         text-align: center;
     }
+    .metric-card h4 {
+        color: #555;
+        margin-bottom: 10px;
+    }
+    .metric-card h2 {
+        color: #1a1a1a;
+        margin: 10px 0;
+    }
+    .metric-card p {
+        color: #666;
+        margin-top: 5px;
+    }
     .warning-box {
         background-color: #ffe8d6;
         border: 3px solid #ff6b35;
@@ -204,16 +216,6 @@ st.markdown("""
         margin: 20px 0;
         border-radius: 10px;
         box-shadow: 0 3px 10px rgba(183, 28, 28, 0.2);
-        color: #2d2d2d;
-    }
-    .success-box {
-        background-color: #d6ffd6;
-        border: 3px solid #4caf50;
-        border-left: 8px solid #2e7d32;
-        padding: 20px;
-        margin: 20px 0;
-        border-radius: 10px;
-        box-shadow: 0 3px 10px rgba(46, 125, 50, 0.2);
         color: #2d2d2d;
     }
     </style>
