@@ -26,60 +26,60 @@ IOU_THRESHOLD = 0.45
 CLASSES = ['buah', 'karbohidrat', 'minuman', 'protein', 'sayur']
 
 #==============================================================================
-# NUTRITION DATABASE [TKPI (Tabel Komposisi Pangan Indonesia) 2017]
-# Referensi: Kementerian Kesehatan RI. (2017). Tabel Komposisi Pangan Indonesia
+# NUTRITION DATABASE (FatSecret Indonesia)
+# Referensi: FatSecret Indonesia (Nutrisi), Antarlina dan FAO/INFOODS et al. 2012(Data Densitas)
 #==============================================================================
 
 NUTRITION_DB = {
-    'buah': {
+    'buah': { #Buah-buahan
         'name': 'Buah',
         'emoji': '🍎',
-        'density': 0.8,  # g/cm³ (Kelkar et al., 2011)
-        'kalori_per_100g': 52,
-        'protein_per_100g': 0.3,
-        'karbohidrat_per_100g': 14,
-        'lemak_per_100g': 0.2,
-        'serat_per_100g': 2.4
+        'density': 0.97,  # g/cm³ (Antarlina et al., 2009)
+        'kalori_per_100g': 51.7,
+        'protein_per_100g': 0.66,
+        'karbohidrat_per_100g': 13.04,
+        'lemak_per_100g': 0.29,
+        'serat_per_100g': 1.60
     },
-    'karbohidrat': {
+    'karbohidrat': { #Makanan Pokok
         'name': 'Karbohidrat',
         'emoji': '🍚',
-        'density': 1.0,  # g/cm³
-        'kalori_per_100g': 130,
-        'protein_per_100g': 2.7,
-        'karbohidrat_per_100g': 28,
-        'lemak_per_100g': 0.3,
-        'serat_per_100g': 0.4
+        'density': 0.73,  # g/cm³ Data FAO
+        'kalori_per_100g': 173.2,
+        'protein_per_100g': 5.32,
+        'karbohidrat_per_100g': 33.06,
+        'lemak_per_100g': 2.24,
+        'serat_per_100g': 2.73
     },
-    'minuman': {
+    'minuman': { #Minuman bernutrisi
         'name': 'Minuman',
         'emoji': '🥤',
-        'density': 1.0,  # g/cm³
-        'kalori_per_100g': 42,
-        'protein_per_100g': 0,
-        'karbohidrat_per_100g': 11,
-        'lemak_per_100g': 0,
+        'density': 1.04,  # g/cm³ Data FAO
+        'kalori_per_100g': 47.7,
+        'protein_per_100g': 1.39,
+        'karbohidrat_per_100g': 9.24,
+        'lemak_per_100g': 0.79,
         'serat_per_100g': 0
     },
-    'protein': {
+    'protein': { #Lauk-pauk
         'name': 'Protein',
         'emoji': '🍗',
-        'density': 1.1,  # g/cm³
-        'kalori_per_100g': 165,  # VALIDATED: Ayam (TKPI 2017)
-        'protein_per_100g': 31,   # VALIDATED: Ayam (TKPI 2017)
-        'karbohidrat_per_100g': 0,
-        'lemak_per_100g': 3.6,
+        'density': 0.95,  # g/cm³ Data FAO
+        'kalori_per_100g': 200.4,  
+        'protein_per_100g': 19.71,   
+        'karbohidrat_per_100g': 2.81,
+        'lemak_per_100g': 12.20,
         'serat_per_100g': 0
     },
-    'sayur': {
+    'sayur': { #Sayur-sayuran
         'name': 'Sayur',
         'emoji': '🥗',
-        'density': 0.6,  # g/cm³
-        'kalori_per_100g': 23,
-        'protein_per_100g': 2.9,
-        'karbohidrat_per_100g': 3.6,
-        'lemak_per_100g': 0.4,
-        'serat_per_100g': 2.6
+        'density': 0.50,  # g/cm³ Data FAO
+        'kalori_per_100g': 54.25,
+        'protein_per_100g': 2.31,
+        'karbohidrat_per_100g': 10.03,
+        'lemak_per_100g': 0.86,
+        'serat_per_100g': 2.95
     }
 }
 
@@ -105,34 +105,79 @@ IDEAL_COMPOSITION = {
 
 #==============================================================================
 # AKG DATABASE - Angka Kecukupan Gizi Indonesia 2019
-# Referensi: Peraturan Menteri Kesehatan RI No. 28 Tahun 2019
-# ✅ ALL VALUES VALIDATED
+# Referensi: Peraturan Menteri Kesehatan RI No. 28 Tahun 2019, Lampiran I Tabel 1
+# ✅ ALL VALUES VALIDATED - per kelompok umur dan jenis kelamin spesifik
 #==============================================================================
 
 AKG_DATABASE = {
-    'male_adult': {
-        'kalori': 2150, 'protein': 62, 'karbohidrat': 340,
-        'lemak': 67, 'serat': 37
+    # ===== LAKI-LAKI =====
+    'male_19_29': {
+        'label': '👨 Laki-laki 19-29 tahun',
+        'kalori': 2650, 'protein': 65, 'karbohidrat': 430,
+        'lemak': 75, 'serat': 37
     },
-    'female_adult': {
-        'kalori': 1900, 'protein': 56, 'karbohidrat': 300,
-        'lemak': 59, 'serat': 32
+    'male_30_49': {
+        'label': '👨 Laki-laki 30-49 tahun',
+        'kalori': 2550, 'protein': 65, 'karbohidrat': 415,
+        'lemak': 70, 'serat': 36
     },
-    'child': {
-        'kalori': 1650, 'protein': 45, 'karbohidrat': 250,
+    'male_50_64': {
+        'label': '👨 Laki-laki 50-64 tahun',
+        'kalori': 2150, 'protein': 65, 'karbohidrat': 340,
+        'lemak': 60, 'serat': 30
+    },
+    # ===== PEREMPUAN =====
+    'female_19_29': {
+        'label': '👩 Perempuan 19-29 tahun',
+        'kalori': 2250, 'protein': 60, 'karbohidrat': 360,
+        'lemak': 65, 'serat': 32
+    },
+    'female_30_49': {
+        'label': '👩 Perempuan 30-49 tahun',
+        'kalori': 2150, 'protein': 60, 'karbohidrat': 340,
+        'lemak': 60, 'serat': 30
+    },
+    'female_50_64': {
+        'label': '👩 Perempuan 50-64 tahun',
+        'kalori': 1800, 'protein': 60, 'karbohidrat': 280,
         'lemak': 50, 'serat': 25
     },
+    # ===== ANAK =====
+    'child_7_9': {
+        'label': '🧒 Anak 7-9 tahun',
+        'kalori': 1650, 'protein': 40, 'karbohidrat': 250,
+        'lemak': 55, 'serat': 23
+    },
+    'child_10_12': {
+        'label': '🧒 Anak 10-12 tahun (rata-rata L+P)',
+        'kalori': 1950, 'protein': 53, 'karbohidrat': 290,
+        'lemak': 65, 'serat': 28
+    },
+    # ===== IBU HAMIL =====
+    # Base: Perempuan 19-29 tahun + tambahan per trimester (Tabel 1, baris Hamil)
     'pregnant_trimester1': {
-        'kalori': 2080, 'protein': 57, 'karbohidrat': 325,
-        'lemak': 61.3, 'serat': 35
+        'label': '🤰 Ibu Hamil Trimester 1',
+        'kalori': 2430,     # 2250 + 180
+        'protein': 61,      # 60 + 1
+        'karbohidrat': 385, # 360 + 25
+        'lemak': 67.3,      # 65 + 2.3
+        'serat': 35         # 32 + 3
     },
     'pregnant_trimester2': {
-        'kalori': 2200, 'protein': 66, 'karbohidrat': 340,
-        'lemak': 61.3, 'serat': 36
+        'label': '🤰 Ibu Hamil Trimester 2',
+        'kalori': 2550,     # 2250 + 300
+        'protein': 70,      # 60 + 10
+        'karbohidrat': 400, # 360 + 40
+        'lemak': 67.3,      # 65 + 2.3
+        'serat': 36         # 32 + 4
     },
     'pregnant_trimester3': {
-        'kalori': 2200, 'protein': 86, 'karbohidrat': 340,
-        'lemak': 61.3, 'serat': 36
+        'label': '🤰 Ibu Hamil Trimester 3',
+        'kalori': 2550,     # 2250 + 300
+        'protein': 90,      # 60 + 30
+        'karbohidrat': 400, # 360 + 40
+        'lemak': 67.3,      # 65 + 2.3
+        'serat': 36         # 32 + 4
     }
 }
 
@@ -227,7 +272,7 @@ st.markdown("""
 
 def calculate_nutrition_from_grams(class_name, weight_grams):
     """
-    Calculate nutrition from weight using TKPI 2017 database
+    Calculate nutrition from weight using FatSecretIndonesia platform data
     
     IMPORTANT: Sistem TIDAK mendeteksi nutrisi (kalori, protein, serat, dll) 
     secara langsung dari gambar!
@@ -235,7 +280,7 @@ def calculate_nutrition_from_grams(class_name, weight_grams):
     Proses:
     1. YOLOv8 mendeteksi KATEGORI makanan (buah/karbohidrat/protein/sayur/minuman)
     2. Estimasi BERAT dari segmentation mask (Area × Tinggi × Densitas)
-    3. LOOKUP nilai nutrisi per 100g dari TKPI 2017 berdasarkan kategori
+    3. LOOKUP nilai nutrisi per 100g dari FatSecret Indonesia
     4. Perhitungan: Total_nutrisi = (Berat / 100) × Nutrisi_per_100g
     
     Args:
@@ -798,7 +843,7 @@ def main():
         <ol>
             <li>YOLOv8 mendeteksi <strong>KATEGORI</strong> makanan (buah/karbohidrat/protein/sayur/minuman)</li>
             <li>Estimasi <strong>BERAT</strong> dari segmentation mask (Area × Tinggi × Densitas)</li>
-            <li><strong>LOOKUP</strong> nilai nutrisi per 100g dari TKPI 2017 berdasarkan kategori</li>
+            <li><strong>LOOKUP</strong> nilai nutrisi per 100g dari FatSecret Indonesia</li>
             <li>Perhitungan: <code>Total_nutrisi = Σ(Nutrisi_per_100g × Berat_aktual / 100)</code></li>
             <li>Perbandingan dengan AKG 2019: KURANG (&lt;80%), CUKUP (80-120%), BERLEBIH (&gt;120%)</li>
         </ol>
@@ -824,15 +869,8 @@ def main():
         
         user_type = st.selectbox(
             "Profil Pengguna",
-            ['male_adult', 'female_adult', 'child', 'pregnant_trimester1', 'pregnant_trimester2', 'pregnant_trimester3'],
-            format_func=lambda x: {
-                'male_adult': '👨 Dewasa Laki-laki',
-                'female_adult': '👩 Dewasa Perempuan',
-                'child': '🧒 Anak (10-12 tahun)',
-                'pregnant_trimester1': '🤰 Ibu Hamil Trimester 1',
-                'pregnant_trimester2': '🤰 Ibu Hamil Trimester 2',
-                'pregnant_trimester3': '🤰 Ibu Hamil Trimester 3'
-            }[x]
+            list(AKG_DATABASE.keys()),
+            format_func=lambda x: AKG_DATABASE[x]['label']
         )
         
         # Show AKG for selected profile
@@ -880,11 +918,12 @@ def main():
         - Class-weighted loss
         
         **Referensi Ilmiah:**
-        - TKPI 2017
+        - FatSecret Indonesia
+        - Antarlina et al. (2009)
         - Permenkes 28/2019
         - Fang et al. (2011)
         - Pouladzadeh et al. (2014)
-        - Kelkar et al. (2011)
+        - etc.
         """)
     
     # Main App
@@ -1001,8 +1040,8 @@ def main():
         <p>© 2026 Mochamad Faisal Akbar | Powered by YOLOv8-seg</p>
         <p><strong>Referensi Ilmiah:</strong></p>
         <p style="font-size: 12px;">
-        TKPI 2017 | Permenkes 28/2019 | Pedoman Isi Piringku (Kemenkes RI, 2017)<br>
-        Fang et al. (2011) | Pouladzadeh et al. (2014) | Kelkar et al. (2011) | Ballard (1981)
+        FatSecret Indonesia | FAO/INFOODS et al. 2012 |  Permenkes 28/2019 | Pedoman Isi Piringku (Kemenkes RI, 2017)<br>
+        Fang et al. (2011) | Pouladzadeh et al. (2014) | Antarlina et al. (2009) | Ballard (1981)
         </p>
         <p><em>Sistem ini menggunakan estimasi berbasis computer vision. Untuk kebutuhan medis, konsultasikan dengan ahli gizi.</em></p>
     </div>
