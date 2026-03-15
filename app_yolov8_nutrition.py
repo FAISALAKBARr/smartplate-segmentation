@@ -269,6 +269,23 @@ st.markdown("""
 #==============================================================================
 # HELPER FUNCTIONS
 #==============================================================================
+def resize_image_for_inference(image, max_size=1280):
+    """
+    Resize image to max_size on longest side to speed up inference.
+    Smartphone photos can be 4000x3000+, this reduces to 1280px max.
+    """
+    w, h = image.size
+    if max(w, h) <= max_size:
+        return image
+    
+    if w > h:
+        new_w = max_size
+        new_h = int(h * max_size / w)
+    else:
+        new_h = max_size
+        new_w = int(w * max_size / h)
+    
+    return image.resize((new_w, new_h), Image.LANCZOS)
 
 def calculate_nutrition_from_grams(class_name, weight_grams):
     """
@@ -941,19 +958,23 @@ def main():
             
             with col1:
                 image = Image.open(uploaded_file)
+                w, h = image.size
+                if max(w, h) > 1280:
+                    st.info(f"📱 Foto {w}×{h}px dioptimasi untuk analisis yang lebih cepat")
                 st.image(image, caption="Gambar Original", use_container_width=True)
             
             if st.button("🔍 Analisis Nutrisi", type="primary"):
                 with st.spinner("⏳ Sedang menganalisis makanan Anda..."):
+                    image_resized = resize_image_for_inference(image, max_size=1280)
                     results = model.predict(
-                        source=image, 
+                        source=image_resized, 
                         conf=conf_threshold, 
                         iou=IOU_THRESHOLD, 
                         verbose=False
                     )
                     
                     annotated_img, detections, pixel_to_cm, plate_detected = process_segmentation_results(
-                        image, results, conf_threshold
+                        image_resized, results, conf_threshold
                     )
                     
                     st.session_state['annotated_img'] = annotated_img
@@ -1003,17 +1024,21 @@ def main():
         
         if camera_img:
             image = Image.open(camera_img)
+            w, h = image.size
+            if max(w, h) > 1280:
+                st.info(f"📱 Foto {w}×{h}px dioptimasi untuk analisis yang lebih cepat")
+            image_resized = resize_image_for_inference(image, max_size=1280)
             
             with st.spinner("⏳ Menganalisis foto dari kamera..."):
                 results = model.predict(
-                    source=image, 
+                    source=image_resized, 
                     conf=conf_threshold,
                     iou=IOU_THRESHOLD, 
                     verbose=False
                 )
                 
                 annotated_img, detections, pixel_to_cm, plate_detected = process_segmentation_results(
-                    image, results, conf_threshold
+                    image_resized, results, conf_threshold
                 )
                 
                 st.image(annotated_img, caption="Hasil Analisis", use_container_width=True)
