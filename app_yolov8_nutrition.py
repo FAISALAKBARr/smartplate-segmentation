@@ -18,8 +18,8 @@ st.set_page_config(
 # CONFIGURATION
 #==============================================================================
 
-MODEL_ID = '1KPbuf5rjNLT9oRsQuZ8f3Xncl4qoIGBL'  # ⚠️ CHANGE THIS to your model ID
-MODEL_PATH = 'best_nutrition_segmentation.pt'
+MODEL_ID = '1PMsmxr2hZ2p_8kkNYRP90VEf8DBEBKNv'  # ⚠️ CHANGE THIS to your model ID
+MODEL_PATH = 'best.pt'
 CONFIDENCE_THRESHOLD = 0.25
 IOU_THRESHOLD = 0.45
 
