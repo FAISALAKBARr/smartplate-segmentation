@@ -18,7 +18,7 @@ st.set_page_config(
 # CONFIGURATION
 #==============================================================================
 
-MODEL_ID = '1PMsmxr2hZ2p_8kkNYRP90VEf8DBEBKNv'  # ⚠️ CHANGE THIS to your model ID
+MODEL_ID = '1BesiFj-R5qQ--z0-_2kD8ZvNcbdGkppY'  # ⚠️ CHANGE THIS to your model ID
 MODEL_PATH = 'best.pt'
 CONFIDENCE_THRESHOLD = 0.25
 IOU_THRESHOLD = 0.45
