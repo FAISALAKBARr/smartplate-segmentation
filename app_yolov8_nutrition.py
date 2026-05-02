@@ -187,8 +187,43 @@ html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
 /* ── Section Headers ── */
 .section-title {
     font-family: 'DM Serif Display', serif;
-    font-size: 1.25rem; color: #1a3a0a; margin: 1.4rem 0 0.7rem;
-    padding-bottom: 6px; border-bottom: 2px solid #d4e8c2;
+    font-size: 1.25rem; color: #3a8a2a; margin: 1.4rem 0 0.7rem;
+    padding-bottom: 6px; border-bottom: 2px solid #5aaa3a;
+}
+
+/* ── Chart Card (always light background so matplotlib labels are readable) ── */
+.chart-card {
+    background: #ffffff; border-radius: 14px;
+    padding: 16px 8px 8px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    border: 1px solid rgba(0,0,0,0.06);
+}
+.chart-card-title {
+    text-align: center; font-family: 'DM Serif Display', serif;
+    font-size: 1rem; color: #1a1a1a; margin-bottom: 4px;
+}
+
+/* ── Dark-mode overrides ── */
+@media (prefers-color-scheme: dark) {
+    .section-title { color: #7acc55; border-bottom-color: #4a8a2a; }
+    .guide-card { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); }
+    .guide-card-text { color: #c8e8a8; }
+    .guide-card-text strong { color: #e8f8d0; }
+    .disclaimer-card { background: rgba(245,216,122,0.12); border-color: rgba(245,216,122,0.3); color: #e0c870; }
+    .disclaimer-card strong { color: #f0e090; }
+    .minuman-box { background: rgba(74,144,217,0.12); border-color: rgba(74,144,217,0.35); }
+    .minuman-box h4 { color: #90c8f0; }
+    .minuman-box p { color: #a8d0f0; }
+    .missing-box { background: rgba(245,195,50,0.1); border-color: rgba(245,195,50,0.3); color: #e0c060; }
+    .missing-box strong { color: #f0d070; }
+    .metric-card { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.1); }
+    .metric-card .mc-label { color: #aaa; }
+    .metric-card .mc-value { color: #f0f0f0; }
+    .metric-card .mc-sub { color: #888; }
+    .err-box { background: rgba(229,57,53,0.12); border-color: rgba(229,57,53,0.3); color: #f0a0a0; }
+    .akg-kurang   { background: rgba(192,57,43,0.2);  color: #ff8a80; }
+    .akg-cukup    { background: rgba(39,174,96,0.2);  color: #69f0ae; }
+    .akg-berlebih { background: rgba(230,126,34,0.2); color: #ffcc80; }
 }
 
 /* ── Minuman Info Box ── */
@@ -641,6 +676,48 @@ def show_akg_comparison(analysis):
             )
 
 
+def _make_pie_fig(title: str, sizes: list, labels: list, colors: list,
+                  fmt: str = '%1.1f%%') -> plt.Figure:
+    """
+    Buat pie chart dengan background putih eksplisit dan teks gelap,
+    agar tetap terbaca di tema gelap maupun terang Streamlit.
+    """
+    # Paksa rcParams agar teks chart selalu gelap (tidak mengikuti tema Streamlit)
+    plt.rcParams.update({
+        'text.color':        '#1a1a1a',
+        'axes.labelcolor':   '#1a1a1a',
+        'xtick.color':       '#1a1a1a',
+        'ytick.color':       '#1a1a1a',
+        'figure.facecolor':  '#ffffff',
+        'axes.facecolor':    '#ffffff',
+        'savefig.facecolor': '#ffffff',
+    })
+
+    fig, ax = plt.subplots(figsize=(5, 5))
+    fig.patch.set_facecolor('#ffffff')   # putih solid — tidak transparan
+    ax.set_facecolor('#ffffff')
+
+    wedges, texts, autotexts = ax.pie(
+        sizes, labels=labels, colors=colors,
+        autopct=fmt, startangle=90,
+        textprops={'fontsize': 9, 'color': '#1a1a1a'},
+        wedgeprops={'linewidth': 1.8, 'edgecolor': '#ffffff'}
+    )
+    for at in autotexts:
+        at.set_fontsize(8)
+        at.set_color('#1a1a1a')
+    for t in texts:
+        t.set_color('#1a1a1a')
+
+    ax.set_title(title, fontsize=12, fontweight='bold', color='#1a1a1a', pad=12)
+
+    # Tambahkan border tipis di sekeliling figure agar terlihat bersih di dark mode
+    fig.patch.set_linewidth(1)
+    fig.patch.set_edgecolor('#e0e0e0')
+
+    return fig
+
+
 def show_composition_charts(analysis):
     st.markdown('<div class="section-title">🥧 Komposisi Piring vs Isi Piringku</div>', unsafe_allow_html=True)
 
@@ -654,41 +731,38 @@ def show_composition_charts(analysis):
     col1, col2 = st.columns(2)
 
     with col1:
-        fig, ax = plt.subplots(figsize=(5, 5), facecolor='none')
         labels, sizes, colors_pie = [], [], []
         for c in FOOD_CLASSES:
             pct = analysis['composition'][c]
             if pct > 0.5:
-                labels.append(f"{NUTRITION_DB[c]['emoji']} {NUTRITION_DB[c]['name']}\n{pct:.1f}%")
+                labels.append(f"{NUTRITION_DB[c]['name']}\n{pct:.1f}%")
                 sizes.append(pct)
                 colors_pie.append(CHART_COLORS[c])
+
         if sizes:
-            wedges, texts, autotexts = ax.pie(
-                sizes, labels=labels, colors=colors_pie,
-                autopct='%1.1f%%', startangle=90,
-                textprops={'fontsize': 9},
-                wedgeprops={'linewidth': 1.5, 'edgecolor': 'white'}
-            )
-            for at in autotexts:
-                at.set_fontsize(8)
-        ax.set_title('Aktual', fontsize=12, fontweight='bold', pad=10)
-        st.pyplot(fig)
-        plt.close(fig)
+            fig = _make_pie_fig('Aktual', sizes, labels, colors_pie, fmt='%1.1f%%')
+            # Bungkus dalam card putih agar border terlihat jelas di dark mode
+            st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+            st.pyplot(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            plt.close(fig)
+        else:
+            st.info("Tidak ada data komposisi untuk ditampilkan.")
 
     with col2:
-        fig, ax = plt.subplots(figsize=(5, 5), facecolor='none')
-        ideal_labels  = [f"{NUTRITION_DB[c]['emoji']} {NUTRITION_DB[c]['name']}\n{IDEAL_COMPOSITION[c]}%" for c in FOOD_CLASSES]
-        ideal_sizes   = [IDEAL_COMPOSITION[c] for c in FOOD_CLASSES]
-        ideal_colors  = [CHART_COLORS[c] for c in FOOD_CLASSES]
-        ax.pie(
-            ideal_sizes, labels=ideal_labels, colors=ideal_colors,
-            autopct='%1.0f%%', startangle=90,
-            textprops={'fontsize': 9},
-            wedgeprops={'linewidth': 1.5, 'edgecolor': 'white'}
-        )
-        ax.set_title('Ideal (Isi Piringku)', fontsize=12, fontweight='bold', pad=10)
-        st.pyplot(fig)
+        ideal_labels = [f"{NUTRITION_DB[c]['name']}\n{IDEAL_COMPOSITION[c]}%" for c in FOOD_CLASSES]
+        ideal_sizes  = [IDEAL_COMPOSITION[c] for c in FOOD_CLASSES]
+        ideal_colors = [CHART_COLORS[c] for c in FOOD_CLASSES]
+
+        fig = _make_pie_fig('Ideal (Isi Piringku)', ideal_sizes, ideal_labels,
+                            ideal_colors, fmt='%1.0f%%')
+        st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+        st.pyplot(fig, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
         plt.close(fig)
+
+    # Reset rcParams supaya tidak bocor ke plot lain
+    plt.rcdefaults()
 
     st.caption("📌 Isi Piringku — Kemenkes RI (2017) · Minuman tidak termasuk proporsi piring")
 
