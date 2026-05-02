@@ -790,7 +790,7 @@ def build_sidebar():
         st.markdown("""
         <div style="text-align:center;padding:1rem 0 0.5rem;">
             <div style="font-size:2.2rem;">🍽️</div>
-            <div style="font-family:'DM Serif Display',serif;font-size:1.3rem;color:#1a3a0a;font-weight:bold;">SmartPlate</div>
+            <div style="font-family:'DM Serif Display',serif;font-size:1.3rem;color:#7acc55;font-weight:bold;">SmartPlate</div>
             <div style="font-size:0.73rem;color:#888;letter-spacing:0.5px;">NUTRITION BALANCE DETECTOR</div>
         </div>
         """, unsafe_allow_html=True)
