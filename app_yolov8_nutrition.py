@@ -10,6 +10,14 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import pandas as pd
 
+# HEIC/HEIF support (iPhone native format)
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+    _HEIC_SUPPORTED = True
+except ImportError:
+    _HEIC_SUPPORTED = False
+
 # ─── PAGE CONFIG ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="SmartPlate – Nutrition Analyzer",
@@ -298,6 +306,18 @@ div[data-testid="stExpander"] { border: 1.5px solid #d4e8c2 !important; border-r
 # ==============================================================================
 # CORE FUNCTIONS
 # ==============================================================================
+
+def safe_open_image(file) -> Image.Image:
+    """
+    Buka gambar dari file upload, dengan dukungan HEIC/HEIF (iPhone).
+    Selalu mengembalikan PIL Image dalam mode RGB.
+    """
+    img = Image.open(file)
+    # HEIC kadang dikembalikan sebagai mode 'RGBA' atau mode lain — normalkan ke RGB
+    if img.mode not in ('RGB',):
+        img = img.convert('RGB')
+    return img
+
 
 def resize_image_for_inference(image, max_size=1280):
     w, h = image.size
@@ -999,17 +1019,17 @@ def run_analysis(image, conf_threshold, user_type, model):
 
 def show_calibration_info(result):
     if result['plate_ok']:
-        st.success(f"✅ Piring terdeteksi — kalibrasi otomatis: {result['pixel_to_cm']:.4f} cm/pixel")
+        st.success("✅ Piring terdeteksi — estimasi ukuran porsi dihitung dari diameter piring 22 cm.")
     else:
         st.markdown("""
         <div style="background:#fff8e1;border:1.5px solid #ffcc02;border-left:4px solid #f59e0b;
                     border-radius:10px;padding:12px 16px;font-size:0.84rem;color:#5a3e00;margin:0.5rem 0;">
-            <strong>📐 Piring tidak terdeteksi otomatis — kalibrasi fallback aktif</strong><br>
+            <strong>📐 Piring tidak terdeteksi otomatis — estimasi tetap berjalan</strong><br>
             Sistem mengasumsikan piring berdiameter <strong>22 cm</strong> memenuhi sekitar 70% area foto.<br>
             <span style="color:#7a5500;">
-            💡 <em>Agar estimasi tetap akurat tanpa deteksi otomatis: foto dari tepat di atas piring,
-            posisikan piring agar hampir memenuhi seluruh frame — seolah piring Anda adalah
-            "bingkai" dari foto tersebut. Hindari foto dari terlalu jauh.</em>
+            💡 <em>Agar estimasi tetap akurat: foto dari tepat di atas piring dan posisikan piring
+            agar hampir memenuhi seluruh frame — seolah piring Anda adalah "bingkai" dari foto tersebut.
+            Hindari foto dari terlalu jauh.</em>
             </span>
         </div>
         """, unsafe_allow_html=True)
@@ -1037,14 +1057,17 @@ def main():
 
     # ── TAB UPLOAD ────────────────────────────────────────────────────────────
     with tab_upload:
+        _accepted = ['jpg', 'jpeg', 'png'] + (['heic', 'heif'] if _HEIC_SUPPORTED else [])
         uploaded = st.file_uploader(
             "Pilih foto piring makanan Anda",
-            type=['jpg', 'jpeg', 'png'],
-            label_visibility="collapsed"
+            type=_accepted,
+            label_visibility="collapsed",
+            help="Format didukung: JPG, PNG" + (", HEIC/HEIF (iPhone)" if _HEIC_SUPPORTED else
+                 " · Install pillow-heif untuk dukungan HEIC")
         )
 
         if uploaded:
-            image = Image.open(uploaded)
+            image = safe_open_image(uploaded)
             col_orig, col_result = st.columns(2)
 
             with col_orig:
@@ -1091,7 +1114,7 @@ def main():
         camera_img = st.camera_input("Arahkan kamera ke piring makanan Anda", label_visibility="collapsed")
 
         if camera_img:
-            image = Image.open(camera_img)
+            image = safe_open_image(camera_img)
             with st.spinner("Menganalisis foto dari kamera…"):
                 result = run_analysis(image, conf_threshold, user_type, model)
 
