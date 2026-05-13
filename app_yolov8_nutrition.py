@@ -22,8 +22,8 @@ st.set_page_config(
 # CONFIGURATION
 # ==============================================================================
 
-MODEL_ID             = '1E1F1kJ3v_dc7R8ffyXiWmWOTLodjoaAT'  # ⚠️ CHANGE THIS
-MODEL_PATH           = 'best_exp_C2_l_aug.pt'
+MODEL_ID             = '1BesiFj-R5qQ--z0-_2kD8ZvNcbdGkppY'  # ⚠️ CHANGE THIS
+MODEL_PATH           = 'best.pt'
 CONFIDENCE_THRESHOLD = 0.25
 IOU_THRESHOLD        = 0.45
 
@@ -335,9 +335,10 @@ def calculate_nutrition_from_grams(class_name, weight_grams):
 def detect_plate_circle(image_np):
     """
     Hough Circle Transform untuk kalibrasi piring.
-    Asumsi diameter standar piring = 25 cm.
+    Asumsi diameter standar piring = 22 cm.
     Referensi: Ballard (1981); Puri et al. (2009)
     """
+    PLATE_DIAMETER_CM = 22.0   # diameter piring yang digunakan penelitian
     gray    = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
     blurred = cv2.GaussianBlur(gray, (9, 9), 2)
     circles = cv2.HoughCircles(
@@ -346,8 +347,9 @@ def detect_plate_circle(image_np):
     )
     if circles is not None:
         c = max(np.round(circles[0]).astype(int), key=lambda x: x[2])
-        return 25.0 / (c[2] * 2), True
-    return 0.05, False
+        return PLATE_DIAMETER_CM / (c[2] * 2), True
+    # Fallback: anggap piring memenuhi 70% dimensi terpanjang frame
+    return PLATE_DIAMETER_CM / (max(image_np.shape[:2]) * 0.70), False
 
 
 @st.cache_resource
@@ -521,8 +523,8 @@ def show_guide():
             <div class="guide-card">
                 <div class="guide-card-icon">🍽️</div>
                 <div class="guide-card-text">
-                    <strong>Piring Putih Ø 25 cm</strong>
-                    Gunakan piring putih polos untuk kalibrasi ukuran porsi yang lebih akurat.
+                    <strong>Piring Putih Ø 22 cm</strong>
+                    Gunakan piring putih polos diameter 22 cm untuk kalibrasi ukuran porsi yang akurat.
                 </div>
             </div>
             <div class="guide-card">
@@ -767,6 +769,118 @@ def show_composition_charts(analysis):
     st.caption("📌 Isi Piringku — Kemenkes RI (2017) · Minuman tidak termasuk proporsi piring")
 
 
+def show_data_assumptions():
+    """
+    Expander: transparansi data asumsi & konstanta yang digunakan sistem.
+    Ditampilkan hanya jika user membukanya — tidak memenuhi layar saat load.
+    """
+    with st.expander("🔬 Data Asumsi & Konstanta Sistem", expanded=False):
+        st.markdown("""
+        <p style="font-size:0.85rem;color:#555;margin-bottom:1rem;">
+        Berikut adalah nilai-nilai konstan yang digunakan sistem untuk mengestimasi berat dan
+        menghitung kandungan gizi. Semua nilai bersifat <em>rata-rata representatif per kategori</em>,
+        bukan nilai spesifik per jenis makanan.
+        </p>
+        """, unsafe_allow_html=True)
+
+        tab_nutrisi, tab_densitas, tab_tinggi = st.tabs(
+            ["🧪 Nilai Nutrisi", "⚖️ Densitas", "📏 Tinggi Asumsi"]
+        )
+
+        # ── TAB 1: Nilai Nutrisi per 100g ─────────────────────────────────────
+        with tab_nutrisi:
+            st.caption("Rata-rata kandungan gizi per 100g bahan — Sumber: FatSecret Indonesia")
+            nutrisi_rows = []
+            display_order = ['buah', 'karbohidrat', 'protein', 'sayur', 'minuman']
+            for cls in display_order:
+                db = NUTRITION_DB[cls]
+                note = " *(info only)*" if cls == 'minuman' else ""
+                nutrisi_rows.append({
+                    'Kategori':          f"{db['emoji']} {db['name']}{note}",
+                    'Energi (kkal)':     db['kalori_per_100g'],
+                    'Protein (g)':       db['protein_per_100g'],
+                    'Karbohidrat (g)':   db['karbohidrat_per_100g'],
+                    'Lemak (g)':         db['lemak_per_100g'],
+                    'Serat (g)':         db['serat_per_100g'],
+                })
+            st.dataframe(pd.DataFrame(nutrisi_rows), use_container_width=True, hide_index=True)
+
+            st.markdown("""
+            <div style="font-size:0.78rem;color:#888;line-height:1.7;margin-top:6px;">
+            <strong>Detail sumber per kategori:</strong><br>
+            🍎 <strong>Buah</strong> — rata-rata 9 item: Pepaya, Melon, Semangka, Buah Naga, Nanas, Mangga, Pisang, Salad Buah, Apel<br>
+            🍚 <strong>Karbohidrat</strong> — rata-rata 6 item: Nasi Putih, Nasi Goreng, Roti Putih, Roti, Ubi, Mie<br>
+            🥤 <strong>Minuman</strong> — rata-rata 9 item: Teh Manis, Minuman Buah, Jus Mangga, Jus Buah Naga, Jus Wortel Tomat, Jus Jeruk, Susu, Susu Murni, Susu Rendah Lemak<br>
+            🍗 <strong>Protein</strong> — rata-rata 5 item: Tunjang, Daging Sapi, Steak Daging Sapi, Tempe, Telur<br>
+            🥗 <strong>Sayur</strong> — rata-rata per kategori · Sumber: FatSecret Indonesia
+            </div>
+            """, unsafe_allow_html=True)
+
+        # ── TAB 2: Densitas ───────────────────────────────────────────────────
+        with tab_densitas:
+            st.caption("Densitas digunakan dalam formula estimasi berat: Berat (g) = Volume (cm³) × Densitas (g/cm³)")
+            densitas_rows = [
+                {'Kategori': '🍎 Buah',        'Densitas (g/cm³)': 0.97,
+                 'Catatan': 'Rata-rata buah lokal Kalimantan',
+                 'Sumber': 'Antarlina Balai et al. (2009)'},
+                {'Kategori': '🍚 Karbohidrat',  'Densitas (g/cm³)': 0.73,
+                 'Catatan': 'Representatif nasi putih matang',
+                 'Sumber': 'FAO/INFOODS (2012)'},
+                {'Kategori': '🥤 Minuman',      'Densitas (g/cm³)': 1.04,
+                 'Catatan': 'Rata-rata jus & susu cair',
+                 'Sumber': 'FAO/INFOODS (2012)'},
+                {'Kategori': '🍗 Protein',      'Densitas (g/cm³)': 0.95,
+                 'Catatan': 'Representatif daging & tempe/telur',
+                 'Sumber': 'FAO/INFOODS (2012)'},
+                {'Kategori': '🥗 Sayur',        'Densitas (g/cm³)': 0.50,
+                 'Catatan': 'Sayuran berdaun & berkubah rendah',
+                 'Sumber': 'FAO/INFOODS (2012)'},
+            ]
+            st.dataframe(pd.DataFrame(densitas_rows), use_container_width=True, hide_index=True)
+            st.markdown("""
+            <div style="font-size:0.78rem;color:#888;margin-top:4px;">
+            Nilai densitas digunakan bersama asumsi tinggi untuk mengestimasi volume 3D dari area mask 2D.
+            </div>
+            """, unsafe_allow_html=True)
+
+        # ── TAB 3: Tinggi Asumsi ──────────────────────────────────────────────
+        with tab_tinggi:
+            st.caption("Tinggi rata-rata diasumsikan secara konstan per kategori untuk menghitung volume")
+            tinggi_rows = [
+                {'Kategori': '🍎 Buah',        'Tinggi Asumsi (cm)': 3.5,
+                 'Alasan': 'Buah bulat berukuran sedang (pepaya, mangga, pisang)'},
+                {'Kategori': '🍚 Karbohidrat',  'Tinggi Asumsi (cm)': 2.5,
+                 'Alasan': 'Nasi/mie disajikan rata di piring, ketebalan sedang'},
+                {'Kategori': '🥤 Minuman',      'Tinggi Asumsi (cm)': 10.0,
+                 'Alasan': 'Tinggi gelas/wadah minuman standar'},
+                {'Kategori': '🍗 Protein',      'Tinggi Asumsi (cm)': 3.0,
+                 'Alasan': 'Potongan daging/tempe/telur goreng rata-rata'},
+                {'Kategori': '🥗 Sayur',        'Tinggi Asumsi (cm)': 2.0,
+                 'Alasan': 'Sayuran cenderung pipih saat disajikan di piring'},
+            ]
+            st.dataframe(pd.DataFrame(tinggi_rows), use_container_width=True, hide_index=True)
+            st.markdown("""
+            <div style="font-size:0.78rem;color:#888;margin-top:4px;">
+            <strong>Formula estimasi berat:</strong>
+            Berat (g) = Area<sub>2D</sub> (px) × (cm/px)² × Tinggi (cm) × Densitas (g/cm³)<br>
+            Referensi: Fang et al. (2011); Pouladzadeh et al. (2014)
+            </div>
+            """, unsafe_allow_html=True)
+
+        # ── Kalibrasi piring ──────────────────────────────────────────────────
+        st.divider()
+        st.markdown("""
+        <div style="font-size:0.82rem;color:#555;line-height:1.7;">
+        <strong>📐 Kalibrasi Piring</strong><br>
+        Sistem mendeteksi lingkaran piring menggunakan <em>Hough Circle Transform</em>.
+        Jika piring terdeteksi, skala dihitung dari diameter piring = <strong>22 cm</strong>.
+        Jika tidak terdeteksi, fallback mengasumsikan piring memenuhi ≈70% area foto —
+        sehingga penting untuk mengisi frame foto dengan piring Anda.<br>
+        Referensi: Ballard (1981); Puri et al. (2009)
+        </div>
+        """, unsafe_allow_html=True)
+
+
 def display_full_analysis(analysis, food_detections, minuman_detections):
     """Orchestrate the full result display."""
     show_minuman_info(minuman_detections)
@@ -790,7 +904,7 @@ def build_sidebar():
         st.markdown("""
         <div style="text-align:center;padding:1rem 0 0.5rem;">
             <div style="font-size:2.2rem;">🍽️</div>
-            <div style="font-family:'DM Serif Display',serif;font-size:1.3rem;color:#7acc55;font-weight:bold;">SmartPlate</div>
+            <div style="font-family:'DM Serif Display',serif;font-size:1.3rem;color:#1a3a0a;font-weight:bold;">SmartPlate</div>
             <div style="font-size:0.73rem;color:#888;letter-spacing:0.5px;">NUTRITION BALANCE DETECTOR</div>
         </div>
         """, unsafe_allow_html=True)
@@ -885,16 +999,27 @@ def run_analysis(image, conf_threshold, user_type, model):
 
 def show_calibration_info(result):
     if result['plate_ok']:
-        st.success(f"✅ Piring terdeteksi — kalibrasi: {result['pixel_to_cm']:.4f} cm/pixel")
+        st.success(f"✅ Piring terdeteksi — kalibrasi otomatis: {result['pixel_to_cm']:.4f} cm/pixel")
     else:
-        st.warning(f"⚠️ Piring tidak terdeteksi — fallback calibration: {result['pixel_to_cm']:.4f} cm/pixel")
-        st.caption("💡 Gunakan piring putih polos Ø 25 cm untuk estimasi yang lebih akurat.")
+        st.markdown("""
+        <div style="background:#fff8e1;border:1.5px solid #ffcc02;border-left:4px solid #f59e0b;
+                    border-radius:10px;padding:12px 16px;font-size:0.84rem;color:#5a3e00;margin:0.5rem 0;">
+            <strong>📐 Piring tidak terdeteksi otomatis — kalibrasi fallback aktif</strong><br>
+            Sistem mengasumsikan piring berdiameter <strong>22 cm</strong> memenuhi sekitar 70% area foto.<br>
+            <span style="color:#7a5500;">
+            💡 <em>Agar estimasi tetap akurat tanpa deteksi otomatis: foto dari tepat di atas piring,
+            posisikan piring agar hampir memenuhi seluruh frame — seolah piring Anda adalah
+            "bingkai" dari foto tersebut. Hindari foto dari terlalu jauh.</em>
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 def main():
     show_header()
     conf_threshold, user_type = build_sidebar()
     show_guide()
+    show_data_assumptions()
 
     model = load_model()
     if model is None:
