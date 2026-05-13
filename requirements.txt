@@ -2,6 +2,7 @@ streamlit
 ultralytics
 opencv-python-headless
 pillow
+pillow-heif
 numpy
 gdown
 matplotlib
