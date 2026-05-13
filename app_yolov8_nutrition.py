@@ -30,8 +30,8 @@ st.set_page_config(
 # CONFIGURATION
 # ==============================================================================
 
-MODEL_ID             = '1BesiFj-R5qQ--z0-_2kD8ZvNcbdGkppY'  # ⚠️ CHANGE THIS
-MODEL_PATH           = 'best.pt'
+MODEL_ID             = '1E1F1kJ3v_dc7R8ffyXiWmWOTLodjoaAT'  # ⚠️ CHANGE THIS
+MODEL_PATH           = 'best_exp_C2_l_aug.pt'
 CONFIDENCE_THRESHOLD = 0.25
 IOU_THRESHOLD        = 0.45
 
