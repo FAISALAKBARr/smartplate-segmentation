@@ -401,7 +401,7 @@ def detect_plate_circle(image_np):
             # ~20% piksel tepi di sepanjang keliling = threshold minimum
             # Piring nyata: 30-60% edge pixel (mean ~75-150)
             # Pola palsu: <15% edge pixel (mean <38)
-            if edge_strength < 50:
+            if edge_strength < 45:
                 continue
 
             return PLATE_DIAMETER_CM / (r * 2), True
