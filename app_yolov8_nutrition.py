@@ -359,17 +359,32 @@ def detect_plate_circle(image_np):
     Referensi: Ballard (1981); Puri et al. (2009)
     """
     PLATE_DIAMETER_CM = 22.0   # diameter piring yang digunakan penelitian
+    h, w = image_np.shape[:2]
+    min_dim = min(h, w) 
+    
     gray    = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
     blurred = cv2.GaussianBlur(gray, (9, 9), 2)
+    
     circles = cv2.HoughCircles(
         blurred, cv2.HOUGH_GRADIENT, dp=1.2, minDist=100,
-        param1=50, param2=30, minRadius=50, maxRadius=500
+        param1=50, param2=60, minRadius=int(min_dim * 0.25), maxRadius=int(min_dim * 0.55)
     )
     if circles is not None:
-        c = max(np.round(circles[0]).astype(int), key=lambda x: x[2])
-        return PLATE_DIAMETER_CM / (c[2] * 2), True
-    # Fallback: anggap piring memenuhi 70% dimensi terpanjang frame
-    return PLATE_DIAMETER_CM / (max(image_np.shape[:2]) * 0.70), False
+        candidate = max(np.round(circles[0]).astype(int), key=lambda x: x[2])
+        cx, cy, r = candidate
+
+        # Validasi 1: lingkaran harus cukup besar (minimal 30% dari sisi terpendek)
+        if r < min_dim * 0.30:
+            return PLATE_DIAMETER_CM / (min_dim * 0.70), False
+
+        # Validasi 2: pusat lingkaran harus berada dalam batas wajar frame
+        margin = r * 0.4
+        if not (margin < cx < w - margin and margin < cy < h - margin):
+            return PLATE_DIAMETER_CM / (min_dim * 0.70), False
+
+        return PLATE_DIAMETER_CM / (r * 2), True
+
+    return PLATE_DIAMETER_CM / (min_dim * 0.70), False
 
 
 @st.cache_resource
