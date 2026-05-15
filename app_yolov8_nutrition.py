@@ -333,7 +333,7 @@ def estimate_weight_from_mask(mask, class_name, pixel_to_cm):
     Formula: Berat (g) = Area_2D (cm²) × Tinggi_asumsi (cm) × Densitas (g/cm³)
     Referensi: Fang et al. (2011); Pouladzadeh et al. (2014)
     """
-    HEIGHT_CM = {'buah': 3.5, 'karbohidrat': 2.0, 'minuman': 10.0, 'protein': 3.0, 'sayur': 2.0}
+    HEIGHT_CM = {'buah': 3.5, 'karbohidrat': 2.0, 'minuman': 10.0, 'protein': 0.75, 'sayur': 1.25}
     area_pixels = np.sum(mask > 0)
     area_cm2    = area_pixels * (pixel_to_cm ** 2)
     volume_cm3  = area_cm2 * HEIGHT_CM.get(class_name, 2.5)
@@ -387,18 +387,9 @@ def detect_plate_circle(image_np):
             ys = np.clip((cy + r * np.sin(angles)).astype(int), 0, h - 1)
             edge_strength = float(np.mean(edges[ys, xs]))
 
-            if edge_strength < 45:
-                continue  # terlalu lemah, coba kandidat berikutnya
-
-            if edge_strength >= 60:
-                # Kepercayaan tinggi: rim piring terdeteksi jelas → pakai circle
+            if edge_strength >= 45:
                 return PLATE_DIAMETER_CM / (r * 2), True
 
-            # Kepercayaan sedang (45–59): circle ditemukan tapi bukan rim luar piring
-            # (biasanya batas makanan/piring), fallback lebih akurat untuk kasus ini
-            break  # hentikan pencarian, jatuh ke fallback
-
-    # Fallback: asumsi piring memenuhi 70% dimensi terpanjang
     return PLATE_DIAMETER_CM / (max_dim * 0.70), False
 
 
