@@ -890,14 +890,14 @@ def show_data_assumptions():
             tinggi_rows = [
                 {'Kategori': '🍎 Buah',        'Tinggi Asumsi (cm)': 3.5,
                  'Alasan': 'Buah bulat berukuran sedang (pepaya, mangga, pisang)'},
-                {'Kategori': '🍚 Karbohidrat',  'Tinggi Asumsi (cm)': 2.5,
-                 'Alasan': 'Nasi/mie disajikan rata di piring, ketebalan sedang'},
+                {'Kategori': '🍚 Karbohidrat',  'Tinggi Asumsi (cm)': 2.0,   # ← ubah dari 2.5
+                 'Alasan': 'Nasi disajikan rata di piring, ketebalan empiris ~2 cm'},
                 {'Kategori': '🥤 Minuman',      'Tinggi Asumsi (cm)': 10.0,
                  'Alasan': 'Tinggi gelas/wadah minuman standar'},
-                {'Kategori': '🍗 Protein',      'Tinggi Asumsi (cm)': 3.0,
-                 'Alasan': 'Potongan daging/tempe/telur goreng rata-rata'},
-                {'Kategori': '🥗 Sayur',        'Tinggi Asumsi (cm)': 2.0,
-                 'Alasan': 'Sayuran cenderung pipih saat disajikan di piring'},
+                {'Kategori': '🍗 Protein',      'Tinggi Asumsi (cm)': 0.75,  # ← ubah dari 3.0
+                 'Alasan': 'Lauk tipis (tempe goreng, dll.) ~0,5–1 cm; hasil kalibrasi empiris'},
+                {'Kategori': '🥗 Sayur',        'Tinggi Asumsi (cm)': 1.25,  # ← ubah dari 2.0
+                 'Alasan': 'Sayur tumis disajikan pipih; hasil kalibrasi empiris ~1–1,5 cm'},
             ]
             st.dataframe(pd.DataFrame(tinggi_rows), use_container_width=True, hide_index=True)
             st.markdown("""
