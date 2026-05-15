@@ -355,59 +355,50 @@ def calculate_nutrition_from_grams(class_name, weight_grams):
 def detect_plate_circle(image_np):
     """
     Hough Circle Transform untuk kalibrasi piring dengan validasi Canny edge.
-    Asumsi diameter standar piring = 22 cm.
+    Dua level kepercayaan: ≥60 = pakai circle, 45-60 = pakai fallback, <45 = tolak.
     Referensi: Ballard (1981); Puri et al. (2009)
     """
     PLATE_DIAMETER_CM = 22.0
     h, w = image_np.shape[:2]
-    max_dim = max(h, w)   # ← dikembalikan ke max_dim untuk fallback
+    max_dim = max(h, w)
     min_dim = min(h, w)
 
     gray    = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
     blurred = cv2.GaussianBlur(gray, (9, 9), 2)
 
-    # Radius wajar untuk piring 22cm yang mengisi 56-104% dari sisi terpendek
-    min_r = int(min_dim * 0.28)
-    max_r = int(min_dim * 0.52)
-
     circles = cv2.HoughCircles(
         blurred, cv2.HOUGH_GRADIENT, dp=1.2,
-        minDist=min_dim // 2,   # cukup satu lingkaran dominan
-        param1=80,              # threshold Canny internal lebih ketat
-        param2=65,              # accumulator threshold lebih ketat dari 30
-        minRadius=min_r,
-        maxRadius=max_r
+        minDist=min_dim // 2,
+        param1=80, param2=65,
+        minRadius=int(min_dim * 0.28),
+        maxRadius=int(min_dim * 0.52)
     )
 
     if circles is not None:
-        # Hitung edge map Canny sekali untuk semua kandidat
         edges = cv2.Canny(blurred, 50, 150)
         candidates = np.round(circles[0]).astype(int)
 
-        # Urutkan dari radius terbesar (piring paling dominan lebih diprioritaskan)
         for cx, cy, r in sorted(candidates, key=lambda x: -x[2]):
-
-            # Validasi 1: pusat harus di area 15-85% frame (bukan di tepi)
             if not (w * 0.15 < cx < w * 0.85 and h * 0.15 < cy < h * 0.85):
                 continue
 
-            # Validasi 2: verifikasi kekuatan tepi melingkar via Canny
-            # Piring asli punya rim yang menghasilkan tepi kuat & konsisten
             angles = np.linspace(0, 2 * np.pi, 120)
             xs = np.clip((cx + r * np.cos(angles)).astype(int), 0, w - 1)
             ys = np.clip((cy + r * np.sin(angles)).astype(int), 0, h - 1)
             edge_strength = float(np.mean(edges[ys, xs]))
 
-            # ~20% piksel tepi di sepanjang keliling = threshold minimum
-            # Piring nyata: 30-60% edge pixel (mean ~75-150)
-            # Pola palsu: <15% edge pixel (mean <38)
-            if edge_strength < 50:
-                continue
+            if edge_strength < 45:
+                continue  # terlalu lemah, coba kandidat berikutnya
 
-            return PLATE_DIAMETER_CM / (r * 2), True
+            if edge_strength >= 60:
+                # Kepercayaan tinggi: rim piring terdeteksi jelas → pakai circle
+                return PLATE_DIAMETER_CM / (r * 2), True
 
-    # Fallback: piring diasumsikan mengisi 70% dimensi TERPANJANG
-    # (konsisten dengan kode asli — max_dim, bukan min_dim)
+            # Kepercayaan sedang (45–59): circle ditemukan tapi bukan rim luar piring
+            # (biasanya batas makanan/piring), fallback lebih akurat untuk kasus ini
+            break  # hentikan pencarian, jatuh ke fallback
+
+    # Fallback: asumsi piring memenuhi 70% dimensi terpanjang
     return PLATE_DIAMETER_CM / (max_dim * 0.70), False
 
 
