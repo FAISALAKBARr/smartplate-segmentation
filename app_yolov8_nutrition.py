@@ -333,7 +333,7 @@ def estimate_weight_from_mask(mask, class_name, pixel_to_cm):
     Formula: Berat (g) = Area_2D (cm²) × Tinggi_asumsi (cm) × Densitas (g/cm³)
     Referensi: Fang et al. (2011); Pouladzadeh et al. (2014)
     """
-    HEIGHT_CM = {'buah': 3.0, 'karbohidrat': 2.0, 'minuman': 10.0, 'protein': 0.75, 'sayur': 1.25}
+    HEIGHT_CM = {'buah': 3.5, 'karbohidrat': 2.0, 'minuman': 10.0, 'protein': 0.75, 'sayur': 1.25}
     area_pixels = np.sum(mask > 0)
     area_cm2    = area_pixels * (pixel_to_cm ** 2)
     volume_cm3  = area_cm2 * HEIGHT_CM.get(class_name, 2.5)
@@ -888,15 +888,15 @@ def show_data_assumptions():
         with tab_tinggi:
             st.caption("Tinggi rata-rata diasumsikan secara konstan per kategori untuk menghitung volume")
             tinggi_rows = [
-                {'Kategori': '🍎 Buah',        'Tinggi Asumsi (cm)': 3.5,
+                {'Kategori': '🍎 Buah',        'Tinggi Asumsi (cm)': 3.5, # ← ubah dari 2.0
                  'Alasan': 'Buah bulat berukuran sedang (pepaya, mangga, pisang)'},
-                {'Kategori': '🍚 Karbohidrat',  'Tinggi Asumsi (cm)': 2.0,   # ← ubah dari 2.5
+                {'Kategori': '🍚 Karbohidrat',  'Tinggi Asumsi (cm)': 2.0, 
                  'Alasan': 'Nasi disajikan rata di piring, ketebalan empiris ~2 cm'},
                 {'Kategori': '🥤 Minuman',      'Tinggi Asumsi (cm)': 10.0,
                  'Alasan': 'Tinggi gelas/wadah minuman standar'},
-                {'Kategori': '🍗 Protein',      'Tinggi Asumsi (cm)': 0.75,  # ← ubah dari 3.0
+                {'Kategori': '🍗 Protein',      'Tinggi Asumsi (cm)': 0.75,  # ← ubah dari 2.5
                  'Alasan': 'Lauk tipis (tempe goreng, dll.) ~0,5–1 cm; hasil kalibrasi empiris'},
-                {'Kategori': '🥗 Sayur',        'Tinggi Asumsi (cm)': 1.25,  # ← ubah dari 2.0
+                {'Kategori': '🥗 Sayur',        'Tinggi Asumsi (cm)': 1.25,  # ← ubah dari 1.5
                  'Alasan': 'Sayur tumis disajikan pipih; hasil kalibrasi empiris ~1–1,5 cm'},
             ]
             st.dataframe(pd.DataFrame(tinggi_rows), use_container_width=True, hide_index=True)
