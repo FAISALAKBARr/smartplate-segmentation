@@ -357,6 +357,8 @@ def detect_plate_circle(image_np):
     Hough Circle Transform untuk kalibrasi piring dengan validasi Canny edge.
     Dua level kepercayaan: ≥60 = pakai circle, 45-60 = pakai fallback, <45 = tolak.
     Referensi: Ballard (1981); Puri et al. (2009)
+    Sekarang mengembalikan tuple (pixel_to_cm, plate_detected, circle_info)
+    di mana circle_info = (cx, cy, r) jika terdeteksi, atau None jika tidak.
     """
     PLATE_DIAMETER_CM = 22.0
     h, w = image_np.shape[:2]
@@ -388,9 +390,11 @@ def detect_plate_circle(image_np):
             edge_strength = float(np.mean(edges[ys, xs]))
 
             if edge_strength >= 45:
-                return PLATE_DIAMETER_CM / (r * 2), True
+                pixel_to_cm = PLATE_DIAMETER_CM / (r * 2)
+                return pixel_to_cm, True, (int(cx), int(cy), int(r))
 
-    return PLATE_DIAMETER_CM / (max_dim * 0.70), False
+    pixel_to_cm = PLATE_DIAMETER_CM / (max_dim * 0.70)
+    return pixel_to_cm, False, None
 
 
 @st.cache_resource
@@ -409,7 +413,7 @@ def load_model():
 def process_segmentation_results(image, results, conf_threshold):
     img_array    = np.array(image)
     annotated    = img_array.copy()
-    pixel_to_cm, plate_detected = detect_plate_circle(img_array)
+    pixel_to_cm, plate_detected, circle_info = detect_plate_circle(img_array)
 
     COLORS = {
         'buah':        (232,  84,  74),
@@ -419,8 +423,8 @@ def process_segmentation_results(image, results, conf_threshold):
         'sayur':       ( 39, 174,  96),
     }
 
-    food_detections    = []   # buah, karbo, protein, sayur
-    minuman_detections = []   # minuman only
+    food_detections    = []
+    minuman_detections = []
 
     if results[0].masks is not None:
         masks = results[0].masks.data.cpu().numpy()
@@ -465,7 +469,76 @@ def process_segmentation_results(image, results, conf_threshold):
             cv2.putText(annotated, lbl, (x1, y1 - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
-    return annotated, food_detections, minuman_detections, pixel_to_cm, plate_detected
+    # ── Visualisasi HCT ────────────────────────────────────────────────────────
+    if plate_detected and circle_info is not None:
+        cx, cy, r = circle_info
+        h_img, w_img = annotated.shape[:2]
+
+        # Lingkaran utama: putih solid
+        cv2.circle(annotated, (cx, cy), r, (255, 255, 255), 3)
+        # Lingkaran utama: overlay hijau semi-transparan tipis
+        ring_overlay = annotated.copy()
+        cv2.circle(ring_overlay, (cx, cy), r, (80, 220, 100), 6)
+        annotated = cv2.addWeighted(annotated, 0.6, ring_overlay, 0.4, 0)
+
+        # Crosshair di pusat piring
+        cross_len = max(12, r // 8)
+        cv2.line(annotated, (cx - cross_len, cy), (cx + cross_len, cy), (255, 255, 255), 2)
+        cv2.line(annotated, (cx, cy - cross_len), (cx, cy + cross_len), (255, 255, 255), 2)
+
+        # Garis diameter horizontal (putus-putus, abu-abu)
+        gap, seg = 14, 22
+        for x_start in range(cx - r, cx + r, gap + seg):
+            x_end = min(x_start + seg, cx + r)
+            cv2.line(annotated, (x_start, cy), (x_end, cy), (200, 200, 200), 1)
+
+        # Label skala di bagian bawah lingkaran
+        scale_text = f"Ø 22 cm  |  {pixel_to_cm*10:.3f} mm/px"
+        font       = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = max(0.45, min(0.7, w_img / 1000))
+        thickness  = 1
+        (tw, th), _ = cv2.getTextSize(scale_text, font, font_scale, thickness)
+
+        label_x = cx - tw // 2
+        label_y = cy + r + th + 10
+        label_y = min(label_y, h_img - 6)
+
+        # Background pill untuk label
+        pad = 6
+        cv2.rectangle(annotated,
+                      (label_x - pad, label_y - th - pad),
+                      (label_x + tw + pad, label_y + pad),
+                      (30, 30, 30), -1)
+        cv2.rectangle(annotated,
+                      (label_x - pad, label_y - th - pad),
+                      (label_x + tw + pad, label_y + pad),
+                      (80, 220, 100), 1)
+        cv2.putText(annotated, scale_text,
+                    (label_x, label_y),
+                    font, font_scale, (80, 220, 100), thickness, cv2.LINE_AA)
+
+        # Badge "✓ Piring Terdeteksi" di pojok kiri atas
+        badge_text = "Piring: terdeteksi HCT"
+        bfont_scale = max(0.4, min(0.6, w_img / 1100))
+        (bw, bh), _ = cv2.getTextSize(badge_text, font, bfont_scale, 1)
+        cv2.rectangle(annotated, (8, 8), (bw + 20, bh + 18), (30, 30, 30), -1)
+        cv2.rectangle(annotated, (8, 8), (bw + 20, bh + 18), (80, 220, 100), 1)
+        cv2.putText(annotated, badge_text, (14, bh + 12),
+                    font, bfont_scale, (80, 220, 100), 1, cv2.LINE_AA)
+
+    else:
+        # Piring tidak terdeteksi → tampilkan badge fallback
+        h_img, w_img = annotated.shape[:2]
+        badge_text  = "Piring: fallback 70%"
+        font        = cv2.FONT_HERSHEY_SIMPLEX
+        bfont_scale = max(0.4, min(0.6, w_img / 1100))
+        (bw, bh), _ = cv2.getTextSize(badge_text, font, bfont_scale, 1)
+        cv2.rectangle(annotated, (8, 8), (bw + 20, bh + 18), (30, 30, 30), -1)
+        cv2.rectangle(annotated, (8, 8), (bw + 20, bh + 18), (200, 160, 30), 1)
+        cv2.putText(annotated, badge_text, (14, bh + 12),
+                    font, bfont_scale, (200, 160, 30), 1, cv2.LINE_AA)
+
+    return annotated, food_detections, minuman_detections, pixel_to_cm, plate_detected, circle_info
 
 
 def analyze_nutrition_balance(food_detections, user_type):
@@ -1021,7 +1094,7 @@ def run_analysis(image, conf_threshold, user_type, model):
         iou=IOU_THRESHOLD, verbose=False
     )
 
-    annotated, food_dets, minuman_dets, pixel_to_cm, plate_ok = \
+    annotated, food_dets, minuman_dets, pixel_to_cm, plate_ok, circle_info = \
         process_segmentation_results(image_rsz, results, conf_threshold)
 
     analysis = analyze_nutrition_balance(food_dets, user_type)
@@ -1032,6 +1105,7 @@ def run_analysis(image, conf_threshold, user_type, model):
         'minuman_dets':    minuman_dets,
         'pixel_to_cm':     pixel_to_cm,
         'plate_ok':        plate_ok,
+        'circle_info':     circle_info,        # ← baru
         'analysis':        analysis,
         'original_size':   (w, h),
         'resized':         max(w, h) > 1280,
@@ -1039,18 +1113,27 @@ def run_analysis(image, conf_threshold, user_type, model):
 
 
 def show_calibration_info(result):
-    if result['plate_ok']:
-        st.success("✅ Piring terdeteksi — estimasi ukuran porsi dihitung dari diameter piring 22 cm.")
+    plate_ok    = result['plate_ok']
+    circle_info = result.get('circle_info')
+    px_to_cm    = result['pixel_to_cm']
+
+    if plate_ok and circle_info:
+        cx, cy, r = circle_info
+        mm_per_px = px_to_cm * 10
+        st.success(
+            f"✅ **Piring terdeteksi (HCT)** — "
+            f"pusat ({cx}, {cy}) px · jari-jari {r} px · "
+            f"skala **{mm_per_px:.3f} mm/px** (Ø 22 cm referensi)"
+        )
     else:
         st.markdown("""
         <div style="background:#fff8e1;border:1.5px solid #ffcc02;border-left:4px solid #f59e0b;
                     border-radius:10px;padding:12px 16px;font-size:0.84rem;color:#5a3e00;margin:0.5rem 0;">
-            <strong>📐 Piring tidak terdeteksi otomatis — estimasi tetap berjalan</strong><br>
+            <strong>📐 Piring tidak terdeteksi HCT — estimasi fallback aktif</strong><br>
             Sistem mengasumsikan piring berdiameter <strong>22 cm</strong> memenuhi sekitar 70% area foto.<br>
             <span style="color:#7a5500;">
-            💡 <em>Agar estimasi tetap akurat: foto dari tepat di atas piring dan posisikan piring
-            agar hampir memenuhi seluruh frame — seolah piring Anda adalah "bingkai" dari foto tersebut.
-            Hindari foto dari terlalu jauh.</em>
+            💡 <em>Agar estimasi lebih akurat: foto tepat dari atas, piring hampir memenuhi frame,
+            pencahayaan merata tanpa bayangan keras.</em>
             </span>
         </div>
         """, unsafe_allow_html=True)
