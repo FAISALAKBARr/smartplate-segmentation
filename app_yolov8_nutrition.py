@@ -109,19 +109,6 @@ AKG_DATABASE = {
 }
 
 # ==============================================================================
-# ASUMSI FREKUENSI MAKAN  –  Basis Konversi AKG Harian → AKG per Sekali Makan
-# ------------------------------------------------------------------------------
-# Nilai pada AKG_DATABASE di atas adalah TARGET HARIAN (24 jam) sesuai
-# Permenkes No. 28 Tahun 2019. SmartPlate menganalisis SATU FOTO PIRING yang
-# merepresentasikan SATU KALI MAKAN, bukan akumulasi asupan satu hari penuh.
-# Karena itu, target pembanding yang dipakai pada analisis kecukupan gizi
-# (analyze_nutrition_balance) adalah AKG harian ÷ MEALS_PER_DAY, dengan asumsi
-# pola makan 3 kali sehari (sarapan, makan siang, makan malam).
-# ==============================================================================
-
-MEALS_PER_DAY = 3
-
-# ==============================================================================
 # CUSTOM CSS  –  Clean & Classy
 # ==============================================================================
 
@@ -578,16 +565,11 @@ def analyze_nutrition_balance(food_detections, user_type):
     composition = {c: (cat_weights[c] / total_food_weight * 100) if total_food_weight > 0 else 0
                    for c in FOOD_CLASSES}
 
-    # AKG comparison — dibandingkan PER SEKALI MAKAN, bukan akumulasi harian.
-    # Satu foto/deteksi merepresentasikan satu porsi/sekali makan, sehingga
-    # target pembanding adalah AKG harian ÷ MEALS_PER_DAY (asumsi 3x makan/hari),
-    # bukan AKG harian penuh. Lihat komentar pada MEALS_PER_DAY di atas.
+    # AKG comparison
     akg = AKG_DATABASE[user_type]
     akg_comparison = {}
     for nutrient in ['kalori', 'protein', 'karbohidrat', 'lemak', 'serat']:
-        target_daily    = akg[nutrient]
-        target_per_meal = target_daily / MEALS_PER_DAY
-        pct = (total_nutrition[nutrient] / target_per_meal) * 100
+        pct = (total_nutrition[nutrient] / akg[nutrient]) * 100
         if pct < 80:
             status, color, css = 'KURANG',   '#c0392b', 'akg-kurang'
         elif pct <= 120:
@@ -597,8 +579,7 @@ def analyze_nutrition_balance(food_detections, user_type):
         akg_comparison[nutrient] = {
             'percentage': pct, 'status': status,
             'color': color, 'css': css,
-            'target': target_per_meal, 'target_daily': target_daily,
-            'actual': total_nutrition[nutrient]
+            'target': akg[nutrient], 'actual': total_nutrition[nutrient]
         }
 
     # Balance Score
@@ -681,9 +662,7 @@ def show_guide():
             dengan akurasi ±15–30% dari berat aktual. Nilai nutrisi diambil dari database rata-rata per kategori 
             (FatSecret Indonesia), bukan dari jenis makanan spesifik. Minuman dideteksi namun 
             <strong>tidak dihitung</strong> dalam analisis kalori & Isi Piringku — sesuai dengan fokus 
-            estimasi makanan di atas piring. Persentase kecukupan gizi (AKG) dihitung 
-            <strong>per sekali makan</strong> (AKG harian ÷ 3), dengan asumsi pola makan 3 kali sehari — 
-            bukan akumulasi kebutuhan satu hari penuh. Sistem ini merupakan <em>baseline research</em>; 
+            estimasi makanan di atas piring. Sistem ini merupakan <em>baseline research</em>; 
             untuk kebutuhan medis, konsultasikan dengan ahli gizi.
         </div>
         """, unsafe_allow_html=True)
@@ -781,11 +760,8 @@ def show_food_detail_table(food_detections):
 
 
 def show_akg_comparison(analysis):
-    st.markdown('<div class="section-title">📊 Kecukupan Gizi per Sekali Makan</div>', unsafe_allow_html=True)
-    st.caption(
-        f"Dibandingkan terhadap 1/{MEALS_PER_DAY} AKG harian (asumsi {MEALS_PER_DAY}× makan/hari) "
-        "— Permenkes No. 28 Tahun 2019 · KURANG < 80% · CUKUP 80–120% · BERLEBIH > 120%"
-    )
+    st.markdown('<div class="section-title">📊 Kecukupan Gizi vs AKG 2019</div>', unsafe_allow_html=True)
+    st.caption("KURANG < 80% · CUKUP 80–120% · BERLEBIH > 120% — Permenkes No. 28 Tahun 2019")
 
     labels_map = {
         'kalori': 'Kalori', 'protein': 'Protein',
@@ -907,7 +883,7 @@ def show_composition_charts(analysis):
     st.caption("📌 Isi Piringku — Kemenkes RI (2017) · Minuman tidak termasuk proporsi piring")
 
 
-def show_data_assumptions(user_type):
+def show_data_assumptions():
     """
     Expander: transparansi data asumsi & konstanta yang digunakan sistem.
     Ditampilkan hanya jika user membukanya — tidak memenuhi layar saat load.
@@ -921,8 +897,8 @@ def show_data_assumptions(user_type):
         </p>
         """, unsafe_allow_html=True)
 
-        tab_nutrisi, tab_densitas, tab_tinggi, tab_akg = st.tabs(
-            ["🧪 Nilai Nutrisi", "⚖️ Densitas", "📏 Tinggi Asumsi", "🍽️ AKG per Makan"]
+        tab_nutrisi, tab_densitas, tab_tinggi = st.tabs(
+            ["🧪 Nilai Nutrisi", "⚖️ Densitas", "📏 Tinggi Asumsi"]
         )
 
         # ── TAB 1: Nilai Nutrisi per 100g ─────────────────────────────────────
@@ -1005,48 +981,6 @@ def show_data_assumptions(user_type):
             </div>
             """, unsafe_allow_html=True)
 
-        # ── TAB 4: AKG per Makan ──────────────────────────────────────────────
-        with tab_akg:
-            st.caption("Konversi AKG harian (Permenkes 28/2019) menjadi target per sekali makan")
-            st.markdown(f"""
-            <div style="font-size:0.85rem;color:#555;line-height:1.7;">
-            Angka Kecukupan Gizi (AKG) pada Permenkes No. 28 Tahun 2019 merupakan
-            <strong>target asupan harian (24 jam)</strong>. Karena SmartPlate menganalisis
-            <strong>satu foto piring yang merepresentasikan satu kali makan</strong>, nilai AKG
-            harian tersebut tidak dibandingkan langsung terhadap hasil deteksi satu piring —
-            perbandingan langsung akan selalu terbaca "kurang", meskipun porsinya sudah
-            proporsional untuk satu kali makan.
-            </div>
-            <div style="font-size:0.85rem;color:#555;line-height:1.7;margin-top:10px;">
-            <strong>Formula konversi:</strong><br>
-            Target per Makan = AKG Harian ÷ Frekuensi Makan/Hari<br>
-            Frekuensi makan yang digunakan sistem: <strong>{MEALS_PER_DAY}× per hari</strong>
-            (sarapan, makan siang, makan malam).
-            </div>
-            """, unsafe_allow_html=True)
-
-            akg_now = AKG_DATABASE[user_type]
-            akg_split_rows = []
-            for nutrient, label, unit in [
-                ('kalori', 'Kalori', 'kkal'), ('protein', 'Protein', 'g'),
-                ('karbohidrat', 'Karbohidrat', 'g'), ('lemak', 'Lemak', 'g'),
-                ('serat', 'Serat', 'g'),
-            ]:
-                daily = akg_now[nutrient]
-                akg_split_rows.append({
-                    'Zat Gizi': label,
-                    'AKG Harian': f"{daily:.0f} {unit}",
-                    f'Target per Makan (÷{MEALS_PER_DAY})': f"{daily / MEALS_PER_DAY:.1f} {unit}",
-                })
-            st.dataframe(pd.DataFrame(akg_split_rows), use_container_width=True, hide_index=True)
-            st.markdown(f"""
-            <div style="font-size:0.78rem;color:#888;margin-top:4px;">
-            Contoh di atas menggunakan profil <strong>{akg_now['label']}</strong> yang sedang dipilih
-            pada sidebar. Nilai "Target per Makan" inilah yang dipakai sebagai pembagi pada
-            perhitungan status KURANG / CUKUP / BERLEBIH di bagian hasil analisis.
-            </div>
-            """, unsafe_allow_html=True)
-
         # ── Kalibrasi piring ──────────────────────────────────────────────────
         st.divider()
         st.markdown("""
@@ -1117,11 +1051,6 @@ def build_sidebar():
             c1, c2 = st.columns(2)
             c1.caption(label)
             c2.markdown(f"**{val}**")
-        st.caption(
-            f"🍽️ Analisis dibandingkan terhadap **1/{MEALS_PER_DAY} dari AKG harian** ini "
-            f"(≈{akg['kalori']/MEALS_PER_DAY:.0f} kkal/makan), karena satu foto merepresentasikan "
-            f"satu kali makan — asumsi {MEALS_PER_DAY}× makan/hari."
-        )
 
         st.divider()
 
@@ -1214,7 +1143,7 @@ def main():
     show_header()
     conf_threshold, user_type = build_sidebar()
     show_guide()
-    show_data_assumptions(user_type)
+    show_data_assumptions()
 
     model = load_model()
     if model is None:
