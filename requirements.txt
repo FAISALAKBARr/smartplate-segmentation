@@ -1,12 +1,9 @@
 streamlit
-numpy
-pandas
-matplotlib
-scipy
+ultralytics
+opencv-python-headless
 pillow
 pillow-heif
+numpy
 gdown
-opencv-python-headless
-ultralytics
-torch
-torchvision
+matplotlib
+pandas
