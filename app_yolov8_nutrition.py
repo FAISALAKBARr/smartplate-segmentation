@@ -784,7 +784,7 @@ def show_akg_comparison(analysis):
     st.markdown('<div class="section-title">📊 Kecukupan Gizi per Sekali Makan</div>', unsafe_allow_html=True)
     st.caption(
         f"Dibandingkan terhadap 1/{MEALS_PER_DAY} AKG harian (asumsi {MEALS_PER_DAY}× makan/hari) "
-        "— Permenkes No. 28 Tahun 2019 · KURANG < 80% · CUKUP 80–120% · BERLEBIH > 120%"
+        "— Permenkes No. 28 Tahun 2019 & WNPG 2018 · KURANG < 80% · CUKUP 80–110% · BERLEBIH > 110%"
     )
 
     labels_map = {
