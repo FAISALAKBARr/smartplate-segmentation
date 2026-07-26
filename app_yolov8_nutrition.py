@@ -590,7 +590,7 @@ def analyze_nutrition_balance(food_detections, user_type):
         pct = (total_nutrition[nutrient] / target_per_meal) * 100
         if pct < 80:
             status, color, css = 'KURANG',   '#c0392b', 'akg-kurang'
-        elif pct <= 120:
+        elif pct <= 110:
             status, color, css = 'CUKUP',    '#27ae60', 'akg-cukup'
         else:
             status, color, css = 'BERLEBIH', '#e67e22', 'akg-berlebih'
